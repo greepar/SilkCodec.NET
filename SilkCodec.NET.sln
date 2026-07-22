@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkCodec.NET", "SilkCodec.NET\SilkCodec.NET.csproj", "{C8BB131D-A0A5-465B-BA57-3E749C6187B1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkCodec.NET.Tests", "SilkCodec.NET.Tests\SilkCodec.NET.Tests.csproj", "{D64BA343-D97D-4628-B735-E8E972445748}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C8BB131D-A0A5-465B-BA57-3E749C6187B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8BB131D-A0A5-465B-BA57-3E749C6187B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8BB131D-A0A5-465B-BA57-3E749C6187B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8BB131D-A0A5-465B-BA57-3E749C6187B1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D64BA343-D97D-4628-B735-E8E972445748}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D64BA343-D97D-4628-B735-E8E972445748}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D64BA343-D97D-4628-B735-E8E972445748}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D64BA343-D97D-4628-B735-E8E972445748}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
