@@ -28,3 +28,7 @@ File.WriteAllBytes("voice.silk", silk);
 `EncodePcm16LittleEndian` accepts raw mono signed 16-bit little-endian PCM bytes. Incomplete final 20 ms frames are discarded, matching the reference `silk-codec/test/Encoder.c` behavior.
 
 Standard output starts with `#!SILK_V3`, stores each packet as a little-endian signed 16-bit length followed by payload, and ends with `-1`. Tencent output adds a leading `0x02` and omits the terminator.
+
+## Upstream Reference
+
+The managed SILK codec implementation in this project is based on the SILK implementation from [Jitsi/libjitsi](https://github.com/jitsi/libjitsi), licensed under the Apache License 2.0.
