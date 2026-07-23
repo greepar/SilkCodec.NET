@@ -496,7 +496,7 @@ internal static class ControlCodecFLP {
             for( k = 1; k < TARGET_RATE_TAB_SZ; k++ )
             {
                 /* Find bitrate interval in table and interpolate */
-                if( TargetRate_bps < rateTable[ k ] )
+                if( TargetRate_bps <= rateTable[ k ] )
                 {
                     frac = (float)( TargetRate_bps - rateTable[ k - 1 ] ) /
                            (float)( rateTable[ k ] - rateTable[ k - 1 ] );

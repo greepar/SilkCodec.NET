@@ -50,6 +50,29 @@ public sealed class SilkEncoderTests
         Assert.Equal(encoded.Length, 12 + packetLength);
     }
 
+    [Fact]
+    public void MaximumBitRateDoesNotFallOutsideSnrTable()
+    {
+        var pcm = CreateSineWave(48_000, 1_000);
+        var nearMaximum = EncodeAtBitRate(pcm, 99_999);
+        var maximum = EncodeAtBitRate(pcm, 100_000);
+
+        Assert.True(maximum.Length >= nearMaximum.Length * 0.95,
+            $"Maximum bitrate output ({maximum.Length} bytes) unexpectedly fell below the near-maximum output ({nearMaximum.Length} bytes).");
+    }
+
+    private static byte[] EncodeAtBitRate(short[] pcm, int bitRate)
+    {
+        return new SilkEncoder(new SilkEncoderOptions
+        {
+            SampleRate = 48_000,
+            MaxInternalSampleRate = 24_000,
+            BitRate = bitRate,
+            Tencent = true,
+            Complexity = 2
+        }).Encode(pcm);
+    }
+
     private static short[] CreateSineWave(int sampleRate, int durationMilliseconds)
     {
         var samples = new short[sampleRate * durationMilliseconds / 1000];
