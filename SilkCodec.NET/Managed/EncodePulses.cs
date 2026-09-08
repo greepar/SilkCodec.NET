@@ -68,15 +68,16 @@ internal class EncodePulses
             int                   sigtype,        /* I    Sigtype                         */
             int                   QuantOffsetType,/* I    QuantOffsetType                 */
             byte[] q,            /* I    quantization indices            */
-            int                   frame_length    /* I    Frame length                    */
+            int                   frame_length,   /* I    Frame length                    */
+            int[] abs_pulses,
+            int[] sum_pulses,
+            int[] nRshifts,
+            int[] pulses_comb,
+            int[] shell_scratch
     )
     {
         int   i, k, j, iter, bit, nLS, scale_down, RateLevelIndex = 0;
         int abs_q, minSumBits_Q6, sumBits_Q6;
-        int[]   abs_pulses = new int[ MAX_FRAME_LENGTH ];
-        int[]   sum_pulses = new int[ MAX_NB_SHELL_BLOCKS ];
-        int[]   nRshifts   = new int[ MAX_NB_SHELL_BLOCKS ];
-        int[]   pulses_comb = new int[ 8 ];
         int   []abs_pulses_ptr;
         int abs_pulses_ptr_offset;
         byte []pulses_ptr;
@@ -84,6 +85,7 @@ internal class EncodePulses
         int [] cdf_ptr;
         short[] nBits_ptr;
 
+        Array.Clear(pulses_comb);
 
         /****************************/
         /* Prepare for shell coding */
@@ -184,7 +186,7 @@ internal class EncodePulses
         /******************/
         for( i = 0; i < iter; i++ ) {
             if( sum_pulses[ i ] > 0 ) {
-                ShellCoder.SKP_Silk_shell_encoder( psRC, abs_pulses, i * SHELL_CODEC_FRAME_LENGTH);
+                ShellCoder.SKP_Silk_shell_encoder( psRC, abs_pulses, i * SHELL_CODEC_FRAME_LENGTH, shell_scratch);
             }
         }
 

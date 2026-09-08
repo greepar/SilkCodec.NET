@@ -8,6 +8,9 @@ internal sealed class JitsiSilkEncoder : IDisposable
 
     private readonly SKP_Silk_encoder_state_FLP _state = new();
     private readonly SKP_SILK_SDK_EncControlStruct _control = new();
+    private readonly short[] _input;
+    private readonly byte[] _output = new byte[MaxPacketBytes];
+    private readonly short[] _outputLength = new short[1];
     private bool _disposed;
 
     public JitsiSilkEncoder(SilkEncoderOptions options)
@@ -20,23 +23,24 @@ internal sealed class JitsiSilkEncoder : IDisposable
         _control.complexity = options.Complexity;
         _control.useInBandFEC = options.UseInBandFec ? 1 : 0;
         _control.useDTX = options.UseDtx ? 1 : 0;
+        _input = new short[_control.packetSize];
 
         ThrowOnError(EncAPI.SKP_Silk_SDK_InitEncoder(_state, new SKP_SILK_SDK_EncControlStruct()));
     }
 
-    public byte[] EncodeFrame(ReadOnlySpan<short> samples)
+    public ReadOnlySpan<byte> EncodeFrame(ReadOnlySpan<short> samples)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var input = samples.ToArray();
-        var output = new byte[MaxPacketBytes];
-        var outputLength = new short[] { MaxPacketBytes };
-        ThrowOnError(EncAPI.SKP_Silk_SDK_Encode(
-            _state, _control, input, 0, input.Length, output, 0, outputLength));
+        if (samples.Length > _input.Length)
+            throw new ArgumentException("The frame contains more samples than the configured packet size.", nameof(samples));
 
-        var packet = new byte[outputLength[0]];
-        output.AsSpan(0, packet.Length).CopyTo(packet);
-        return packet;
+        samples.CopyTo(_input);
+        _outputLength[0] = MaxPacketBytes;
+        ThrowOnError(EncAPI.SKP_Silk_SDK_Encode(
+            _state, _control, _input, 0, samples.Length, _output, 0, _outputLength));
+
+        return _output.AsSpan(0, _outputLength[0]);
     }
 
     public void Dispose()

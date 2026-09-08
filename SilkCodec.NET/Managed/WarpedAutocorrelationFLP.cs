@@ -17,10 +17,25 @@ internal static class WarpedAutocorrelationFLP
         int length,
         int order)
     {
+        SKP_Silk_warped_autocorrelation_FLP(corr, corrOffset, input, inputOffset, warping, length, order,
+            new double[Define.SHAPE_LPC_ORDER_MAX + 1], new double[Define.SHAPE_LPC_ORDER_MAX + 1]);
+    }
+
+    internal static void SKP_Silk_warped_autocorrelation_FLP(
+        float[] corr,
+        int corrOffset,
+        float[] input,
+        int inputOffset,
+        float warping,
+        int length,
+        int order,
+        double[] state,
+        double[] correlations)
+    {
         EncoderCompat.Assert((order & 1) == 0);
 
-        var state = new double[Define.SHAPE_LPC_ORDER_MAX + 1];
-        var correlations = new double[Define.SHAPE_LPC_ORDER_MAX + 1];
+        Array.Clear(state, 0, order + 1);
+        Array.Clear(correlations, 0, order + 1);
         for (var n = 0; n < length; n++)
         {
             double tmp1 = input[inputOffset + n];

@@ -40,22 +40,23 @@ internal static class LPCInvPredGainFLP
      * @return returns 1 if unstable, otherwise 0
      */
     internal static int SKP_Silk_LPC_inverse_pred_gain_FLP(   /* O:   returns 1 if unstable, otherwise 0      */
-        float[] invGain,               /* O:   inverse prediction gain, energy domain  */
+        out float invGain,             /* O:   inverse prediction gain, energy domain  */
         float[] A,                     /* I:   prediction coefficients [order]         */
         int A_offset,
-        int           order                  /* I:   prediction order                        */
+        int order,                    /* I:   prediction order                        */
+        float[] scratch0,
+        float[] scratch1
     )
     {
         int   k, n;
         double    rc, rc_mult1, rc_mult2;
-        float[][] Atmp = Array.ConvertAll(new float[2 ], _ => new float[SigProcFIX.SKP_Silk_MAX_ORDER_LPC ]);
         float[] Aold, Anew;
 
-        Anew = Atmp[ order & 1 ];
+        Anew = (order & 1) == 0 ? scratch0 : scratch1;
         for(int i_djinn=0; i_djinn<order; i_djinn++)
             Anew[i_djinn] = A[A_offset+i_djinn];
 
-        invGain[0] = 1.0f;
+        invGain = 1.0f;
         for( k = order - 1; k > 0; k-- )
         {
             rc = -Anew[ k ];
@@ -65,10 +66,10 @@ internal static class LPCInvPredGainFLP
             }
             rc_mult1 = 1.0f - rc * rc;
             rc_mult2 = 1.0f / rc_mult1;
-            invGain[0] *= (float)rc_mult1;
+            invGain *= (float)rc_mult1;
             /* swap pointers */
             Aold = Anew;
-            Anew = Atmp[ k & 1 ];
+            Anew = (k & 1) == 0 ? scratch0 : scratch1;
             for( n = 0; n < k; n++ ) {
                 Anew[ n ] = (float)( ( Aold[ n ] - Aold[ k - n - 1 ] * rc ) * rc_mult2 );
             }
@@ -78,7 +79,7 @@ internal static class LPCInvPredGainFLP
             return 1;
         }
         rc_mult1 = 1.0f - rc * rc;
-        invGain[0] *= (float)rc_mult1;
+        invGain *= (float)rc_mult1;
         return 0;
     }
 }

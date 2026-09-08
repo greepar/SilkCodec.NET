@@ -31,6 +31,8 @@ namespace SilkCodec.NET.Managed;
  * @author Dingxin Xu
  */
 internal static class ControlCodecFLP {
+    private static readonly NoiseShapingQuantizerFP Nsq = new NSQImplNSQ();
+    private static readonly NoiseShapingQuantizerFP NsqDelayedDecision = new NSQImplNSQDelDec();
     /**
      * Control encoder SNR.
      *
@@ -411,7 +413,7 @@ internal static class ControlCodecFLP {
             psEnc.sCmn.la_shape                    = 3 * psEnc.sCmn.fs_kHz;
             psEnc.sCmn.nStatesDelayedDecision      = 1;
 //            psEnc.NoiseShapingQuantizer            = SKP_Silk_NSQ;
-            psEnc.noiseShapingQuantizerCB          = new NSQImplNSQ();
+            psEnc.noiseShapingQuantizerCB          = Nsq;
             psEnc.sCmn.useInterpolatedNLSFs        = 0;
             psEnc.sCmn.LTPQuantLowComplexity       = 1;
             psEnc.sCmn.NLSF_MSVQ_Survivors         = MAX_NLSF_MSVQ_SURVIVORS_LC_MODE;
@@ -428,7 +430,7 @@ internal static class ControlCodecFLP {
             psEnc.sCmn.la_shape                    = 5 * psEnc.sCmn.fs_kHz;
             psEnc.sCmn.nStatesDelayedDecision      = 2;
 //            psEnc.NoiseShapingQuantizer            = SKP_Silk_NSQ_del_dec;
-            psEnc.noiseShapingQuantizerCB          = new NSQImplNSQDelDec();
+            psEnc.noiseShapingQuantizerCB          = NsqDelayedDecision;
             psEnc.sCmn.useInterpolatedNLSFs        = 0;
             psEnc.sCmn.LTPQuantLowComplexity       = 0;
             psEnc.sCmn.NLSF_MSVQ_Survivors         = MAX_NLSF_MSVQ_SURVIVORS_MC_MODE;
@@ -445,7 +447,7 @@ internal static class ControlCodecFLP {
             psEnc.sCmn.la_shape                    = 5 * psEnc.sCmn.fs_kHz;
             psEnc.sCmn.nStatesDelayedDecision      = 4;
 //            psEnc.NoiseShapingQuantizer            = SKP_Silk_NSQ_del_dec;
-            psEnc.noiseShapingQuantizerCB          = new NSQImplNSQDelDec();
+            psEnc.noiseShapingQuantizerCB          = NsqDelayedDecision;
             psEnc.sCmn.useInterpolatedNLSFs        = 1;
             psEnc.sCmn.LTPQuantLowComplexity       = 0;
             psEnc.sCmn.NLSF_MSVQ_Survivors         = MAX_NLSF_MSVQ_SURVIVORS;

@@ -70,8 +70,8 @@ internal static class EncodeFrameFLP
         int     LBRR_idx, frame_terminator;
 
         /* Low bitrate redundancy parameters */
-        byte[] LBRRpayload = new byte[MAX_ARITHM_BYTES];
-        short[] nBytesLBRR = new short[1];
+        byte[] LBRRpayload = Array.Empty<byte>();
+        short[] nBytesLBRR = Array.Empty<short>();
 
         int[] FrameTermination_CDF;
 
@@ -431,8 +431,16 @@ internal static class EncodeFrameFLP
         /****************************************/
         /* Low Bitrate Redundant Encoding       */
         /****************************************/
-        nBytesLBRR[0] = MAX_ARITHM_BYTES;
-        SKP_Silk_LBRR_encode_FLP( psEnc, sEncCtrl, LBRRpayload, nBytesLBRR, xfw );
+        if (psEnc.sCmn.LBRR_enabled != 0)
+        {
+            LBRRpayload = new byte[MAX_ARITHM_BYTES];
+            nBytesLBRR = new short[] { MAX_ARITHM_BYTES };
+            SKP_Silk_LBRR_encode_FLP( psEnc, sEncCtrl, LBRRpayload, nBytesLBRR, xfw );
+        }
+        else
+        {
+            sEncCtrl.sCmn.LBRR_usage = SKP_SILK_NO_LBRR;
+        }
 
         /*****************************************/
         /* Noise shaping quantization            */
@@ -530,9 +538,16 @@ internal static class EncodeFrameFLP
                 pnBytesOut[0] = (short) nBytes[0];
 
                 /* Update FEC buffer */
-                Array.Copy(LBRRpayload, 0,
-                        psEnc.sCmn.LBRR_buffer[ psEnc.sCmn.oldest_LBRR_idx ].payload, 0, nBytesLBRR[0]);
-                psEnc.sCmn.LBRR_buffer[ psEnc.sCmn.oldest_LBRR_idx ].nBytes = nBytesLBRR[0];
+                if (nBytesLBRR.Length != 0)
+                {
+                    Array.Copy(LBRRpayload, 0,
+                            psEnc.sCmn.LBRR_buffer[ psEnc.sCmn.oldest_LBRR_idx ].payload, 0, nBytesLBRR[0]);
+                    psEnc.sCmn.LBRR_buffer[ psEnc.sCmn.oldest_LBRR_idx ].nBytes = nBytesLBRR[0];
+                }
+                else
+                {
+                    psEnc.sCmn.LBRR_buffer[ psEnc.sCmn.oldest_LBRR_idx ].nBytes = 0;
+                }
                 /* The below line describes how FEC should be used */
                 psEnc.sCmn.LBRR_buffer[ psEnc.sCmn.oldest_LBRR_idx ].usage = sEncCtrl.sCmn.LBRR_usage;
                 psEnc.sCmn.oldest_LBRR_idx = ( ( psEnc.sCmn.oldest_LBRR_idx + 1 ) & LBRR_IDX_MASK );

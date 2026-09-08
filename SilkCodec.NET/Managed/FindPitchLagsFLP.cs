@@ -134,12 +134,16 @@ internal static class FindPitchLagsFLP
             /*****************************************/
             /* Call Pitch estimator */
             /*****************************************/
-            int[] lagIndex_djinnaddress = {psEncCtrl.sCmn.lagIndex};
-            int[] contourIndex_djinnaddress = {psEncCtrl.sCmn.contourIndex};
-            float[] LTPCorr_djinnaddress = {psEnc.LTPCorr};
+            PitchAnalysisCoreFLP.Workspace workspace = psEnc.pitchAnalysisWorkspace;
+            int[] lagIndex_djinnaddress = workspace.LagIndex;
+            int[] contourIndex_djinnaddress = workspace.ContourIndex;
+            float[] LTPCorr_djinnaddress = workspace.LtpCorrelation;
+            lagIndex_djinnaddress[0] = psEncCtrl.sCmn.lagIndex;
+            contourIndex_djinnaddress[0] = psEncCtrl.sCmn.contourIndex;
+            LTPCorr_djinnaddress[0] = psEnc.LTPCorr;
             psEncCtrl.sCmn.sigtype = PitchAnalysisCoreFLP.SKP_Silk_pitch_analysis_core_FLP( res, psEncCtrl.sCmn.pitchL, lagIndex_djinnaddress,
                     contourIndex_djinnaddress, LTPCorr_djinnaddress, psEnc.sCmn.prevLag, psEnc.pitchEstimationThreshold,
-                thrhld, psEnc.sCmn.fs_kHz, psEnc.sCmn.pitchEstimationComplexity );
+                thrhld, psEnc.sCmn.fs_kHz, psEnc.sCmn.pitchEstimationComplexity, workspace );
             psEncCtrl.sCmn.lagIndex = lagIndex_djinnaddress[0];
             psEncCtrl.sCmn.contourIndex = contourIndex_djinnaddress[0];
             psEnc.LTPCorr = LTPCorr_djinnaddress[0];

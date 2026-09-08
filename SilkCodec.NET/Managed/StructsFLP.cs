@@ -234,6 +234,23 @@ internal sealed class SKP_Silk_encoder_state_FLP
 
     /* Buffer for find pitch and noise shape analysis */
     internal float[]                         x_buf = new float[ 2 * MAX_FRAME_LENGTH + LA_SHAPE_MAX ];/* Buffer for find pitch and noise shape analysis */
+    internal byte[]                          nsqQScratch = new byte[MAX_FRAME_LENGTH];
+    internal short[]                         nsqInput = new short[MAX_FRAME_LENGTH];
+    internal int[]                           nsqGainsQ16 = new int[NB_SUBFR];
+    internal short[][]                       nsqPredCoefQ12 = Structs.CreateJagged<short>(2, MAX_LPC_ORDER);
+    internal short[]                         nsqPredCoefQ12Flat = new short[2 * MAX_LPC_ORDER];
+    internal short[]                         nsqLtpCoefQ14 = new short[LTP_ORDER * NB_SUBFR];
+    internal short[]                         nsqAr2Q13 = new short[NB_SUBFR * SHAPE_LPC_ORDER_MAX];
+    internal int[]                           nsqLfShapeQ14 = new int[NB_SUBFR];
+    internal int[]                           nsqTiltQ14 = new int[NB_SUBFR];
+    internal int[]                           nsqHarmShapeGainQ14 = new int[NB_SUBFR];
+    internal float[]                         noiseShapeWindow = new float[SHAPE_LPC_WIN_MAX];
+    internal float[]                         noiseShapeAutoCorrelation = new float[SHAPE_LPC_ORDER_MAX + 1];
+    internal double[]                        warpedState = new double[SHAPE_LPC_ORDER_MAX + 1];
+    internal double[]                        warpedCorrelations = new double[SHAPE_LPC_ORDER_MAX + 1];
+    internal float[]                         lpcInvPredScratch0 = new float[MAX_LPC_ORDER];
+    internal float[]                         lpcInvPredScratch1 = new float[MAX_LPC_ORDER];
+    internal PitchAnalysisCoreFLP.Workspace  pitchAnalysisWorkspace = new PitchAnalysisCoreFLP.Workspace();
 // djinn: add a parameter: offset
     internal int x_buf_offset;
     internal float                           LTPCorr;                    /* Normalized correlation from pitch lag estimator */

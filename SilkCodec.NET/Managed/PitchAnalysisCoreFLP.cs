@@ -35,6 +35,28 @@ internal static class PitchAnalysisCoreFLP
 
     internal const float eps =  1.192092896e-07f;
 
+    internal sealed class Workspace
+    {
+        internal readonly float[] Signal8Khz = new float[PITCH_EST_FRAME_LENGTH_MS * 8];
+        internal readonly float[] Signal4Khz = new float[PITCH_EST_FRAME_LENGTH_MS * 4];
+        internal readonly float[] Scratch = new float[PITCH_EST_MAX_FRAME_LENGTH * 3];
+        internal readonly float[] FilterState = new float[PITCH_EST_MAX_DECIMATE_STATE_LENGTH];
+        internal readonly float[][] Correlations = EncoderCompat.NewArray<float>(PITCH_EST_NB_SUBFR, (PITCH_EST_MAX_LAG >> 1) + 5);
+        internal readonly float[] CodebookCorrelations = new float[PITCH_EST_NB_CBKS_STAGE2_EXT];
+        internal readonly int[] SearchLags = new int[PITCH_EST_D_SRCH_LENGTH];
+        internal readonly short[] ExpandedLags = new short[(PITCH_EST_MAX_LAG >> 1) + 5];
+        internal readonly float[][][] Stage3Energies = EncoderCompat.NewArray<float>(PITCH_EST_NB_SUBFR, PITCH_EST_NB_CBKS_STAGE3_MAX, PITCH_EST_NB_STAGE3_LAGS);
+        internal readonly float[][][] Stage3Correlations = EncoderCompat.NewArray<float>(PITCH_EST_NB_SUBFR, PITCH_EST_NB_CBKS_STAGE3_MAX, PITCH_EST_NB_STAGE3_LAGS);
+        internal readonly float[] Stage3Scratch = new float[SCRATCH_SIZE];
+        internal readonly short[] Signal12Khz = new short[12 * PITCH_EST_FRAME_LENGTH_MS];
+        internal readonly short[] Signal8KhzFixed = new short[8 * PITCH_EST_FRAME_LENGTH_MS];
+        internal readonly short[] Signal24Khz = new short[PITCH_EST_MAX_FRAME_LENGTH];
+        internal readonly int[] FixedFilterState = new int[8];
+        internal readonly int[] LagIndex = new int[1];
+        internal readonly int[] ContourIndex = new int[1];
+        internal readonly float[] LtpCorrelation = new float[1];
+    }
+
     /* using log2() helps the fixed-point conversion */
     internal static float SKP_P_log2(double x)
     {
@@ -65,29 +87,30 @@ internal static class PitchAnalysisCoreFLP
         float search_thres1,      /* I first stage threshold for lag candidates 0 - 1                 */
         float search_thres2,      /* I threshold for lag candidates 0 - 1                       */
         int   Fs_kHz,             /* I sample frequency (kHz)                                         */
-        int   complexity          /* I Complexity setting, 0-2, where 2 is highest                    */
+        int   complexity,         /* I Complexity setting, 0-2, where 2 is highest                    */
+        Workspace workspace
     )
     {
-        float[] signal_8kHz = new float[ PITCH_EST_FRAME_LENGTH_MS * 8 ];
-        float[] signal_4kHz = new float[ PITCH_EST_FRAME_LENGTH_MS * 4 ];
-        float[] scratch_mem = new float[ PITCH_EST_MAX_FRAME_LENGTH * 3 ];
-        float[] filt_state = new float[ PITCH_EST_MAX_DECIMATE_STATE_LENGTH ];
+        float[] signal_8kHz = workspace.Signal8Khz;
+        float[] signal_4kHz = workspace.Signal4Khz;
+        float[] scratch_mem = workspace.Scratch;
+        float[] filt_state = workspace.FilterState;
         int   i, k, d, j;
         float threshold, contour_bias;
-        float[][] C = EncoderCompat.NewArray<float>(PITCH_EST_NB_SUBFR, (PITCH_EST_MAX_LAG >> 1) + 5); /* use to be +2 but then valgrind reported errors for SWB */
-        float[] CC = new float[PITCH_EST_NB_CBKS_STAGE2_EXT];
+        float[][] C = workspace.Correlations; /* use to be +2 but then valgrind reported errors for SWB */
+        float[] CC = workspace.CodebookCorrelations;
         float[] target_ptr, basis_ptr;
         int target_ptr_offset, basis_ptr_offset;
         double    cross_corr, normalizer, energy, energy_tmp;
-        int[] d_srch = new int[PITCH_EST_D_SRCH_LENGTH];
-        short[] d_comp = new short[(PITCH_EST_MAX_LAG >> 1) + 5];
+        int[] d_srch = workspace.SearchLags;
+        short[] d_comp = workspace.ExpandedLags;
         int   length_d_srch, length_d_comp;
         float Cmax, CCmax, CCmax_b, CCmax_new_b, CCmax_new;
         int   CBimax, CBimax_new, lag, start_lag, end_lag, lag_new;
         int   cbk_offset, cbk_size;
         float lag_log2, prevLag_log2, delta_lag_log2_sqr;
-        float[][][] energies_st3 = EncoderCompat.NewArray<float>(PITCH_EST_NB_SUBFR , PITCH_EST_NB_CBKS_STAGE3_MAX , PITCH_EST_NB_STAGE3_LAGS );
-        float[][][] cross_corr_st3 = EncoderCompat.NewArray<float>(PITCH_EST_NB_SUBFR , PITCH_EST_NB_CBKS_STAGE3_MAX , PITCH_EST_NB_STAGE3_LAGS );
+        float[][][] energies_st3 = workspace.Stage3Energies;
+        float[][][] cross_corr_st3 = workspace.Stage3Correlations;
 
         int diff, lag_counter;
         int frame_length, frame_length_8kHz, frame_length_4kHz;
@@ -128,9 +151,9 @@ internal static class PitchAnalysisCoreFLP
         /* Resample from input sampled at Fs_kHz to 8 kHz */
         if( Fs_kHz == 12 )
         {
-            short[] signal_12 = new short[ 12 * PITCH_EST_FRAME_LENGTH_MS ];
-            short[] signal_8 = new short[   8 * PITCH_EST_FRAME_LENGTH_MS ];
-            int[] R23 = new int[ 6 ];
+            short[] signal_12 = workspace.Signal12Khz;
+            short[] signal_8 = workspace.Signal8KhzFixed;
+            int[] R23 = workspace.FixedFilterState;
 
             /* Resample to 12 -> 8 khz */
             for(int i_djinn=0; i_djinn<6; i_djinn++)
@@ -162,9 +185,9 @@ internal static class PitchAnalysisCoreFLP
         }
         else if( Fs_kHz == 24 )
         {
-            short[] signal_24 = new short[ PITCH_EST_MAX_FRAME_LENGTH ];
-            short[] signal_8 = new short[ 8 * PITCH_EST_FRAME_LENGTH_MS ];
-            int[] filt_state_fix = new int[ 8 ];
+            short[] signal_24 = workspace.Signal24Khz;
+            short[] signal_8 = workspace.Signal8KhzFixed;
+            int[] filt_state_fix = workspace.FixedFilterState;
 
             /* Resample to 24 -> 8 khz */
             SigProcFLP.SKP_float2short_array( signal_24,0, signal,0, 24 * PITCH_EST_FRAME_LENGTH_MS );
@@ -499,8 +522,8 @@ internal static class PitchAnalysisCoreFLP
             CCmax = -1000.0f;
 
             /* Calculate the correlations and energies needed in stage 3 */
-            SKP_P_Ana_calc_corr_st3( cross_corr_st3, signal,0, start_lag, sf_length, complexity );
-            SKP_P_Ana_calc_energy_st3( energies_st3, signal,0, start_lag, sf_length, complexity );
+            SKP_P_Ana_calc_corr_st3( cross_corr_st3, signal,0, start_lag, sf_length, complexity, workspace.Stage3Scratch );
+            SKP_P_Ana_calc_energy_st3( energies_st3, signal,0, start_lag, sf_length, complexity, workspace.Stage3Scratch );
 
             lag_counter = 0;
             EncoderCompat.Assert( lag == SigProcFIX.SKP_SAT16( lag ) );
@@ -584,7 +607,8 @@ internal static class PitchAnalysisCoreFLP
         int signal_offset,
         int start_lag,                  /* I start lag                                                      */
         int sf_length,                  /* I sub frame length                                               */
-        int complexity                  /* I Complexity setting                                             */
+        int complexity,                 /* I Complexity setting                                             */
+        float[] scratch_mem
     )
         /***********************************************************************
          Calculates the correlations used in stage 3 search. In order to cover
@@ -604,8 +628,6 @@ internal static class PitchAnalysisCoreFLP
         int target_ptr_offset, basis_ptr_offset;
         int     i, j, k, lag_counter;
         int     cbk_offset, cbk_size, delta, idx;
-        float[] scratch_mem = new float[ SCRATCH_SIZE ];
-
         EncoderCompat.Assert( complexity >= SigProcFIX.SKP_Silk_PITCH_EST_MIN_COMPLEX );
         EncoderCompat.Assert( complexity <= SigProcFIX.SKP_Silk_PITCH_EST_MAX_COMPLEX );
 
@@ -660,7 +682,8 @@ internal static class PitchAnalysisCoreFLP
         int signal_offset,
         int start_lag,                  /* I start lag                                                      */
         int sf_length,                  /* I sub frame length                                               */
-        int complexity                  /* I Complexity setting                                             */
+        int complexity,                 /* I Complexity setting                                             */
+        float[] scratch_mem
     )
     /****************************************************************
     Calculate the energies for first two subframes. The energies are
@@ -672,8 +695,6 @@ internal static class PitchAnalysisCoreFLP
         double      energy;
         int     k, i, j, lag_counter;
         int     cbk_offset, cbk_size, delta, idx;
-        float[] scratch_mem = new float[ SCRATCH_SIZE ];
-
         EncoderCompat.Assert( complexity >= SigProcFIX.SKP_Silk_PITCH_EST_MIN_COMPLEX );
         EncoderCompat.Assert( complexity <= SigProcFIX.SKP_Silk_PITCH_EST_MAX_COMPLEX );
 

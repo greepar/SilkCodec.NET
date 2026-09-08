@@ -62,7 +62,7 @@ internal class NSQDelDecStruct
  *
  * @author Dingxin Xu
  */
-internal class NSQ_sample_struct : ICloneable
+internal sealed class NSQ_sample_struct
 {
     internal int Q_Q10;
     internal int RD_Q10;
@@ -70,7 +70,35 @@ internal class NSQ_sample_struct : ICloneable
     internal int LF_AR_Q12;
     internal int sLTP_shp_Q10;
     internal int LPC_exc_Q16;
-    public object Clone() => MemberwiseClone();
+
+    internal void CopyFrom(NSQ_sample_struct source)
+    {
+        Q_Q10 = source.Q_Q10;
+        RD_Q10 = source.RD_Q10;
+        xq_Q14 = source.xq_Q14;
+        LF_AR_Q12 = source.LF_AR_Q12;
+        sLTP_shp_Q10 = source.sLTP_shp_Q10;
+        LPC_exc_Q16 = source.LPC_exc_Q16;
+    }
+}
+
+internal sealed class NSQDelDecWorkspace
+{
+    internal readonly int[] SLtpQ16 = new int[2 * MAX_FRAME_LENGTH];
+    internal readonly short[] SLtp = new short[2 * MAX_FRAME_LENGTH];
+    internal readonly int[] FiltState = new int[MAX_LPC_ORDER];
+    internal readonly int[] XScQ10 = new int[MAX_FRAME_LENGTH / NB_SUBFR];
+    internal readonly NSQDelDecStruct[] DelayedDecisionStates = new NSQDelDecStruct[DEL_DEC_STATES_MAX];
+    internal readonly NSQ_sample_struct[][] SampleStates = new NSQ_sample_struct[DEL_DEC_STATES_MAX][];
+
+    internal NSQDelDecWorkspace()
+    {
+        for (var i = 0; i < DEL_DEC_STATES_MAX; i++)
+        {
+            DelayedDecisionStates[i] = new NSQDelDecStruct();
+            SampleStates[i] = new[] { new NSQ_sample_struct(), new NSQ_sample_struct() };
+        }
+    }
 }
 
 /**
@@ -105,24 +133,19 @@ internal class NSQDelDec
         int           A_Q12_offset, B_Q14_offset, AR_shp_Q13_offset;
         short[] pxq;
         int     pxq_offset;
-        int[] sLTP_Q16 = new int[ 2 * MAX_FRAME_LENGTH ];
-        short[] sLTP = new short[ 2 * MAX_FRAME_LENGTH ];
+        NSQDelDecWorkspace workspace = psEncC.delayedDecisionWorkspace;
+        int[] sLTP_Q16 = workspace.SLtpQ16;
+        short[] sLTP = workspace.SLtp;
         int   HarmShapeFIRPacked_Q14;
         int     offset_Q10;
-        int[] FiltState = new int[ MAX_LPC_ORDER ];
+        int[] FiltState = workspace.FiltState;
         int RDmin_Q10;
-        int[] x_sc_Q10 = new int[ MAX_FRAME_LENGTH / NB_SUBFR ];
-        NSQDelDecStruct[] psDelDec = new NSQDelDecStruct[ DEL_DEC_STATES_MAX ];
-        /*
-         * psDelDec is an array of references, which has to be created manually.
-         */
-        {
-            for(int psDelDecIni_i=0; psDelDecIni_i<DEL_DEC_STATES_MAX; psDelDecIni_i++)
-            {
-                psDelDec[psDelDecIni_i] = new NSQDelDecStruct();
-            }
-        }
+        int[] x_sc_Q10 = workspace.XScQ10;
+        NSQDelDecStruct[] psDelDec = workspace.DelayedDecisionStates;
         NSQDelDecStruct psDD;
+
+        Array.Clear(sLTP_Q16);
+        Array.Clear(sLTP);
 
         subfr_length = psEncC.frame_length / NB_SUBFR;
 
@@ -132,10 +155,10 @@ internal class NSQDelDec
         System.Diagnostics.Debug.Assert( NSQ.prev_inv_gain_Q16 != 0 );
 
       //TODO: use a local copy of the parameter short[] x, which is supposed to be input;
-        short[] x_tmp = (short[])x.Clone();
+        short[] x_tmp = x;
         int     x_tmp_offset = 0;
 //TODO: use a local copy of the parameter[] byte q, which is supposed to be output;
-        byte[]  q_tmp = (byte[])q.Clone();
+        byte[]  q_tmp = q;
         int     q_tmp_offset = 0;
 
         /* Initialize delayed decision states */
@@ -261,13 +284,11 @@ internal class NSQDelDec
                 subfr_length, sLTP, sLTP_Q16, k, psEncC.nStatesDelayedDecision, smpl_buf_idx,
                 LTP_scale_Q14, Gains_Q16, psEncCtrlC.pitchL );
 
-            int[] smpl_buf_idx_ptr = new int[1];
-            smpl_buf_idx_ptr[0] = smpl_buf_idx;
             SKP_Silk_noise_shape_quantizer_del_dec( NSQ, psDelDec, psEncCtrlC.sigtype, x_sc_Q10, q_tmp, q_tmp_offset, pxq, pxq_offset,
                     sLTP_Q16, A_Q12, A_Q12_offset, B_Q14, B_Q14_offset, AR_shp_Q13, AR_shp_Q13_offset, lag, HarmShapeFIRPacked_Q14, Tilt_Q14[ k ],
                     LF_shp_Q14[ k ], Gains_Q16[ k ], Lambda_Q10, offset_Q10, psEncC.subfr_length, subfr++, psEncC.shapingLPCOrder, psEncC.predictLPCOrder,
-                psEncC.warping_Q16, psEncC.nStatesDelayedDecision, smpl_buf_idx_ptr, decisionDelay );
-            smpl_buf_idx = smpl_buf_idx_ptr[0];
+            psEncC.warping_Q16, psEncC.nStatesDelayedDecision, ref smpl_buf_idx, decisionDelay,
+            workspace.SampleStates );
 
             x_tmp_offset   += psEncC.subfr_length;
             q_tmp_offset   += psEncC.subfr_length;
@@ -310,8 +331,6 @@ internal class NSQDelDec
 //        SKP_memcpy( NSQ.sLTP_shp_Q10, &NSQ.sLTP_shp_Q10[ psEncC.frame_length ], psEncC.frame_length * sizeof( SKP_int32 ) );
         Array.Copy(NSQ.xq, psEncC.frame_length, NSQ.xq, 0, psEncC.frame_length);
         Array.Copy(NSQ.sLTP_shp_Q10, psEncC.frame_length, NSQ.sLTP_shp_Q10, 0, psEncC.frame_length);
-//TODO: copy back the q_tmp to the output parameter q;
-        Array.Copy(q_tmp, 0, q, 0, q.Length);
     }
 
     /**
@@ -375,8 +394,9 @@ internal class NSQDelDec
         int                 predictLPCOrder,        /* I    Prediction LPC filter order         */
         int                 warping_Q16,            /* I    Warping parameter                   */
         int                 nStatesDelayedDecision, /* I    Number of states input decision tree   */
-        int                 []smpl_buf_idx,          /* I    Index to newest samples input buffers  */
-        int                 decisionDelay           /* I                                        */
+        ref int             smpl_buf_idx,            /* I/O  Index to newest samples input buffers */
+        int                 decisionDelay,          /* I                                        */
+        NSQ_sample_struct[][] psSampleState
     )
     {
         int     i, j, k, Winner_ind, RDmin_ind, RDmax_ind, last_smple_idx;
@@ -391,20 +411,6 @@ internal class NSQDelDec
         int[] pred_lag_ptr, shp_lag_ptr;
         int   pred_lag_ptr_offset, shp_lag_ptr_offset;
         int   []psLPC_Q14; int psLPC_Q14_offset;
-        NSQ_sample_struct[][] psSampleState = new NSQ_sample_struct[ DEL_DEC_STATES_MAX ][];
-        /*
-         * psSampleState is an two-dimension array of reference, which should be created manually.
-         */
-        {
-            for(int Ini_i=0; Ini_i<DEL_DEC_STATES_MAX; Ini_i++)
-            {
-                psSampleState[Ini_i] = new NSQ_sample_struct[2];
-                for(int Ini_j=0; Ini_j<2; Ini_j++)
-                {
-                    psSampleState[Ini_i][Ini_j] = new NSQ_sample_struct();
-                }
-            }
-        }
         NSQDelDecStruct psDD;
         NSQ_sample_struct[]  psSS;
 
@@ -499,7 +505,7 @@ internal class NSQDelDec
                 n_AR_Q10 = ( n_AR_Q10 >> 1 );           /* Q11 -> Q10 */
                 n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psDD.LF_AR_Q12, Tilt_Q14 );
 
-                n_LF_Q10   = ( SKP_SMULWB( psDD.Shape_Q10[ smpl_buf_idx[0] ], LF_shp_Q14 ) << 2 );
+                n_LF_Q10   = ( SKP_SMULWB( psDD.Shape_Q10[ smpl_buf_idx ], LF_shp_Q14 ) << 2 );
                 n_LF_Q10   = SKP_SMLAWT( n_LF_Q10, psDD.LF_AR_Q12, LF_shp_Q14 );
 
                 /* Input minus prediction plus noise feedback                       */
@@ -587,8 +593,8 @@ internal class NSQDelDec
                 psSS[ 1 ].LPC_exc_Q16  = ( LPC_exc_Q10 << 6 );
             }
 
-            smpl_buf_idx[0]  = ( smpl_buf_idx[0] - 1 ) & DECISION_DELAY_MASK;                   /* Index to newest samples              */
-            last_smple_idx = ( smpl_buf_idx[0] + decisionDelay ) & DECISION_DELAY_MASK;       /* Index to decisionDelay old samples   */
+            smpl_buf_idx  = ( smpl_buf_idx - 1 ) & DECISION_DELAY_MASK;                   /* Index to newest samples              */
+            last_smple_idx = ( smpl_buf_idx + decisionDelay ) & DECISION_DELAY_MASK;       /* Index to decisionDelay old samples   */
 
             /* Find winner */
             RDmin_Q10 = psSampleState[ 0 ][ 0 ].RD_Q10;
@@ -634,7 +640,7 @@ internal class NSQDelDec
                 SKP_Silk_copy_del_dec_state( psDelDec[ RDmax_ind ], psDelDec[ RDmin_ind ], i );
 //TODO:how to copy a struct ???
 //                SKP_memcpy( &psSampleState[ RDmax_ind ][ 0 ], &psSampleState[ RDmin_ind ][ 1 ], sizeof( NSQ_sample_struct ) );
-                psSampleState[ RDmax_ind ][ 0 ] = (NSQ_sample_struct) psSampleState[ RDmin_ind ][ 1 ].Clone();
+                psSampleState[ RDmax_ind ][ 0 ].CopyFrom(psSampleState[ RDmin_ind ][ 1 ]);
             }
 
             /* Write samples from winner to output and long-term filter states */
@@ -657,14 +663,14 @@ internal class NSQDelDec
                 psSS                                     = psSampleState[ k ];
                 psDD.LF_AR_Q12                          = psSS[0].LF_AR_Q12;
                 psDD.sLPC_Q14[ NSQ_LPC_BUF_LENGTH() + i ] = psSS[0].xq_Q14;
-                psDD.Xq_Q10[    smpl_buf_idx[0] ]         = ( psSS[0].xq_Q14 >> 4 );
-                psDD.Q_Q10[     smpl_buf_idx[0] ]         = psSS[0].Q_Q10;
-                psDD.Pred_Q16[  smpl_buf_idx[0] ]         = psSS[0].LPC_exc_Q16;
-                psDD.Shape_Q10[ smpl_buf_idx[0] ]         = psSS[0].sLTP_shp_Q10;
+                psDD.Xq_Q10[    smpl_buf_idx ]         = ( psSS[0].xq_Q14 >> 4 );
+                psDD.Q_Q10[     smpl_buf_idx ]         = psSS[0].Q_Q10;
+                psDD.Pred_Q16[  smpl_buf_idx ]         = psSS[0].LPC_exc_Q16;
+                psDD.Shape_Q10[ smpl_buf_idx ]         = psSS[0].sLTP_shp_Q10;
                 psDD.Seed                               = SigProcFIX.SKP_ADD_RSHIFT32( psDD.Seed, psSS[0].Q_Q10, 10 );
-                psDD.RandState[ smpl_buf_idx[0] ]         = psDD.Seed;
+                psDD.RandState[ smpl_buf_idx ]         = psDD.Seed;
                 psDD.RD_Q10                             = psSS[0].RD_Q10;
-                psDD.Gain_Q16[  smpl_buf_idx[0] ]         = Gain_Q16;
+                psDD.Gain_Q16[  smpl_buf_idx ]         = Gain_Q16;
             }
         }
         /* Update LPC states */

@@ -73,12 +73,15 @@ internal class NSQ
         int           A_Q12_offset, B_Q14_offset, AR_shp_Q13_offset;
         short   []pxq;
         int     pxq_offset;
-        int[] sLTP_Q16 = new int[ 2 * MAX_FRAME_LENGTH ];
-        short[] sLTP = new short[ 2 * MAX_FRAME_LENGTH ];
+        int[] sLTP_Q16 = psEncC.nsqSLtpQ16;
+        short[] sLTP = psEncC.nsqSLtp;
         int     HarmShapeFIRPacked_Q14;
         int     offset_Q10;
-        int[] FiltState = new int[ MAX_LPC_ORDER ];
-        int[] x_sc_Q10 = new int[ MAX_FRAME_LENGTH / NB_SUBFR ];
+        int[] FiltState = psEncC.nsqFiltState;
+        int[] x_sc_Q10 = psEncC.nsqXScQ10;
+
+        Array.Clear(sLTP_Q16);
+        Array.Clear(sLTP);
 
         NSQ.rand_seed  =  psEncCtrlC.Seed;
         /* Set unvoiced lag to the previous one, overwrite later for voiced */
@@ -100,10 +103,10 @@ internal class NSQ
         pxq                  = NSQ.xq;
         pxq_offset           = psEncC.frame_length;
 //TODO: use a local copy of the parameter short[] x, which is supposed to be input;
-        short[] x_tmp = (short[])x.Clone();
+        short[] x_tmp = x;
         int     x_tmp_offset = 0;
 //TODO: use a local copy of the parameter[] byte q, which is supposed to be output;
-        byte[]  q_tmp = (byte[])q.Clone();
+        byte[]  q_tmp = q;
         int     q_tmp_offset = 0;
 
         for( k = 0; k < NB_SUBFR; k++ ) {
@@ -162,8 +165,6 @@ internal class NSQ
         Array.Copy(NSQ.xq, psEncC.frame_length, NSQ.xq, 0, psEncC.frame_length);
         Array.Copy(NSQ.sLTP_shp_Q10, psEncC.frame_length, NSQ.sLTP_shp_Q10, 0, psEncC.frame_length);
 
-//TODO: copy back the q_tmp to the output parameter q;
-        Array.Copy(q_tmp, 0, q, 0, q.Length);
     }
 
     /**

@@ -155,7 +155,9 @@ internal class EncodeParameters
         /*********************************************/
         /* Encode quantization indices of excitation */
         /*********************************************/
-        EncodePulses.SKP_Silk_encode_pulses( psRC, psEncCtrlC.sigtype, psEncCtrlC.QuantOffsetType, q, psEncC.frame_length );
+        EncodePulses.SKP_Silk_encode_pulses( psRC, psEncCtrlC.sigtype, psEncCtrlC.QuantOffsetType, q, psEncC.frame_length,
+            psEncC.encodeAbsPulses, psEncC.encodeSumPulses, psEncC.encodePulseShifts,
+            psEncC.encodePulsesCombined, psEncC.shellEncoderScratch );
 
 
         /*********************************************/

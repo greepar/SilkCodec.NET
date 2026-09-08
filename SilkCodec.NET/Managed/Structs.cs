@@ -340,6 +340,17 @@ internal sealed class SKP_Silk_encoder_state
     /* Buffers */
     internal byte[]                      q = new byte[ MAX_FRAME_LENGTH ];      /* pulse signal buffer */
     internal byte[]                      q_LBRR = new byte[ MAX_FRAME_LENGTH ]; /* pulse signal buffer */
+    internal int[]                       nsqSLtpQ16 = new int[2 * MAX_FRAME_LENGTH];
+    internal short[]                     nsqSLtp = new short[2 * MAX_FRAME_LENGTH];
+    internal int[]                       nsqFiltState = new int[MAX_LPC_ORDER];
+    internal int[]                       nsqXScQ10 = new int[MAX_FRAME_LENGTH / NB_SUBFR];
+    internal NSQDelDecWorkspace          delayedDecisionWorkspace = new NSQDelDecWorkspace();
+
+    internal int[]                       encodeAbsPulses = new int[MAX_FRAME_LENGTH];
+    internal int[]                       encodeSumPulses = new int[MAX_NB_SHELL_BLOCKS];
+    internal int[]                       encodePulseShifts = new int[MAX_NB_SHELL_BLOCKS];
+    internal int[]                       encodePulsesCombined = new int[8];
+    internal int[]                       shellEncoderScratch = new int[15];
 }
 
 /**

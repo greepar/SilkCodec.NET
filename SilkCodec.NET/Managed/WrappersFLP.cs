@@ -180,24 +180,20 @@ internal static class WrappersFLP
     {
         int     i, j;
         float   tmp_float;
-        short[]   x_16 = new short[ MAX_FRAME_LENGTH ];
+        short[]   x_16 = psEnc.nsqInput;
         /* Prediction and coding parameters */
-        int[]   Gains_Q16 = new int[ NB_SUBFR ];
-        short[][] PredCoef_Q12 =
-        {
-            new short[MAX_LPC_ORDER],
-            new short[MAX_LPC_ORDER]
-        };
-        short[]   LTPCoef_Q14 = new short[ LTP_ORDER * NB_SUBFR ];
+        int[]   Gains_Q16 = psEnc.nsqGainsQ16;
+        short[][] PredCoef_Q12 = psEnc.nsqPredCoefQ12;
+        short[]   LTPCoef_Q14 = psEnc.nsqLtpCoefQ14;
         int     LTP_scale_Q14;
 
         /* Noise shaping parameters */
         /* Testing */
-        short[] AR2_Q13 = new short[ NB_SUBFR * SHAPE_LPC_ORDER_MAX ];
-        int[]   LF_shp_Q14 = new int[ NB_SUBFR ];         /* Packs two int16 coefficients per int32 value             */
+        short[] AR2_Q13 = psEnc.nsqAr2Q13;
+        int[]   LF_shp_Q14 = psEnc.nsqLfShapeQ14;         /* Packs two int16 coefficients per int32 value             */
         int     Lambda_Q10;
-        int[]     Tilt_Q14 = new int[ NB_SUBFR ];
-        int[]     HarmShapeGain_Q14 = new int[ NB_SUBFR ];
+        int[]     Tilt_Q14 = psEnc.nsqTiltQ14;
+        int[]     HarmShapeGain_Q14 = psEnc.nsqHarmShapeGainQ14;
 
         /* Convert control struct to fix control struct */
         /* Noise shape parameters */
@@ -534,14 +530,14 @@ internal static class WrappersFLP
         /*TEST END************************************************************************/
 
         /* Call NSQ */
-        short[] PredCoef_Q12_dim1_tmp = new short[PredCoef_Q12.Length * PredCoef_Q12[0].Length];
+        short[] PredCoef_Q12_dim1_tmp = psEnc.nsqPredCoefQ12Flat;
         int PredCoef_Q12_offset = 0;
         for(int PredCoef_Q12_i = 0; PredCoef_Q12_i < PredCoef_Q12.Length; PredCoef_Q12_i++)
         {
             Array.Copy(PredCoef_Q12[PredCoef_Q12_i], 0, PredCoef_Q12_dim1_tmp, PredCoef_Q12_offset, PredCoef_Q12[PredCoef_Q12_i].Length);
             PredCoef_Q12_offset += PredCoef_Q12[PredCoef_Q12_i].Length;
         }
-        byte[] qTarget = q_offset == 0 ? q : new byte[psEnc.sCmn.frame_length];
+        byte[] qTarget = q_offset == 0 ? q : psEnc.nsqQScratch;
         SKP_Silk_nsq_state nsq = useLBRR != 0 ? psEnc.sNSQ_LBRR : psEnc.sNSQ;
         if( UsesDelayedDecision( psEnc.sCmn ) )
         {

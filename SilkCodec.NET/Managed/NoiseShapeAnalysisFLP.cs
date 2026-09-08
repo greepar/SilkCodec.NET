@@ -55,8 +55,8 @@ internal static class NoiseShapeAnalysisFLP
         float   SNR_adj_dB, HarmBoost, HarmShapeGain, Tilt;
         float   nrg, pre_nrg, log_energy, log_energy_prev, energy_variation;
         float   delta, BWExp1, BWExp2, gain_mult, gain_add, strength, b, warping;
-        float[] x_windowed = new float[ SHAPE_LPC_WIN_MAX ];
-        float[] auto_corr = new float[ SHAPE_LPC_ORDER_MAX + 1 ];
+        float[] x_windowed = psEnc.noiseShapeWindow;
+        float[] auto_corr = psEnc.noiseShapeAutoCorrelation;
         float[] x_ptr, pitch_res_ptr;
         int x_ptr_offset, pitch_res_ptr_offset=0;
 
@@ -185,7 +185,8 @@ internal static class NoiseShapeAnalysisFLP
             if( psEnc.sCmn.warping_Q16 > 0 )
             {
                 WarpedAutocorrelationFLP.SKP_Silk_warped_autocorrelation_FLP( auto_corr, 0, x_windowed, 0,
-                    warping, psEnc.sCmn.shapeWinLength, psEnc.sCmn.shapingLPCOrder );
+                    warping, psEnc.sCmn.shapeWinLength, psEnc.sCmn.shapingLPCOrder,
+                    psEnc.warpedState, psEnc.warpedCorrelations );
             }
             else
             {
@@ -220,12 +221,10 @@ internal static class NoiseShapeAnalysisFLP
             BwexpanderFLP.SKP_Silk_bwexpander_FLP( psEncCtrl.AR1,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder, BWExp1 );
 
             /* Ratio of prediction gains, in energy domain */
-            float[] pre_nrg_djinnaddress = new float[1];
-            LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( pre_nrg_djinnaddress, psEncCtrl.AR2,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder );
-            pre_nrg = pre_nrg_djinnaddress[0];
-            float[] nrg_djinnaddress = {nrg};
-            LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( nrg_djinnaddress,     psEncCtrl.AR1,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder );
-            nrg = nrg_djinnaddress[0];
+            LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( out pre_nrg, psEncCtrl.AR2,k * SHAPE_LPC_ORDER_MAX,
+                psEnc.sCmn.shapingLPCOrder, psEnc.lpcInvPredScratch0, psEnc.lpcInvPredScratch1 );
+            LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( out nrg, psEncCtrl.AR1,k * SHAPE_LPC_ORDER_MAX,
+                psEnc.sCmn.shapingLPCOrder, psEnc.lpcInvPredScratch0, psEnc.lpcInvPredScratch1 );
             psEncCtrl.GainsPre[ k ] = 1.0f - 0.7f * ( 1.0f - pre_nrg / nrg );
 
             warped_true2monic_coefs( psEncCtrl.AR2, k * SHAPE_LPC_ORDER_MAX,
@@ -440,7 +439,8 @@ internal static class NoiseShapeAnalysisFLP
     {
         float   maxabs, absval, sc;
         int     k, i, idx = 0;
-        float[] invGain = new float[1];
+        float[] scratch0 = new float[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+        float[] scratch1 = new float[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
 
         BwexpanderFLP.SKP_Silk_bwexpander_FLP( a,a_offset, L, bwe );
 
@@ -483,7 +483,7 @@ internal static class NoiseShapeAnalysisFLP
         /**********************/
         for( k = 0; k < 1000; k++ )
         {
-            if( LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( invGain, a,a_offset, L ) == 1 )
+            if( LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( out _, a,a_offset, L, scratch0, scratch1 ) == 1 )
             {
                 BwexpanderFLP.SKP_Silk_bwexpander_FLP( a,a_offset, L, 0.997f );
             }
