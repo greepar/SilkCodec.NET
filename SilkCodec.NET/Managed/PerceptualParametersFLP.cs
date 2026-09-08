@@ -19,6 +19,11 @@ using static SilkCodec.NET.Managed.Macros;
 using static SilkCodec.NET.Managed.Typedef;
 
 namespace SilkCodec.NET.Managed;
+
+/*
+ * Noise shaping constants aligned with SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 /**
  * Perceptual parameters.
  *
@@ -29,7 +34,7 @@ namespace SilkCodec.NET.Managed;
 internal static class PerceptualParametersFLP
 {
     /* reduction in coding SNR during low speech activity */
-    internal const float BG_SNR_DECR_dB =                             3.0f;
+    internal const float BG_SNR_DECR_dB =                             4.0f;
 
     /* factor for reducing quantization noise during voiced speech */
     internal const float HARM_SNR_INCR_dB =                           2.0f;
@@ -42,7 +47,7 @@ internal static class PerceptualParametersFLP
 
 
     /* noise shaping filter chirp factor */
-    internal const float BANDWIDTH_EXPANSION =                        0.94f;
+    internal const float BANDWIDTH_EXPANSION =                        0.95f;
 
     /* difference between chirp factors for analysis and synthesis noise shaping filters at low bitrates */
     internal const float LOW_RATE_BANDWIDTH_EXPANSION_DELTA =         0.01f;
@@ -72,13 +77,13 @@ internal static class PerceptualParametersFLP
     internal const float HP_NOISE_COEF =                              0.3f;
 
     /* parameter for shaping noise extra towards higher frequencies during voiced speech */
-    internal const float HARM_HP_NOISE_COEF =                         0.45f;
+    internal const float HARM_HP_NOISE_COEF =                         0.35f;
 
     /* parameter for applying a high-pass tilt to the input signal */
-    internal const float INPUT_TILT =                                 0.04f;
+    internal const float INPUT_TILT =                                 0.05f;
 
     /* parameter for extra high-pass tilt to the input signal at high rates */
-    internal const float HIGH_RATE_INPUT_TILT =                       0.06f;
+    internal const float HIGH_RATE_INPUT_TILT =                       0.1f;
 
     /* parameter for reducing noise at the very low frequencies */
     internal const float LOW_FREQ_SHAPING =                           3.0f;
@@ -87,7 +92,7 @@ internal static class PerceptualParametersFLP
     internal const float LOW_QUALITY_LOW_FREQ_SHAPING_DECR =          0.5f;
 
     /* fraction added to first autocorrelation value */
-    internal const float SHAPE_WHITE_NOISE_FRACTION =                 4.7684e-5f;
+    internal const float SHAPE_WHITE_NOISE_FRACTION =                 1e-5f;
 
     /* fraction of first autocorrelation value added to residual energy value; limits prediction gain */
     internal const float SHAPE_MIN_ENERGY_RATIO =                     1.526e-5f;       // 1.526e-5 = 1/65536

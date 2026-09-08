@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Sixth-order filtering adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 
 using System;
 using System.Diagnostics;
@@ -51,6 +55,10 @@ internal static class LPCAnalysisFilterFLP
 
         switch( Order )
         {
+            case 6:
+                SKP_Silk_LPC_analysis_filter6_FLP(  r_LPC, PredCoef, s, s_offset, length );
+            break;
+
             case 8:
                 SKP_Silk_LPC_analysis_filter8_FLP(  r_LPC, PredCoef, s, s_offset, length );
             break;
@@ -75,6 +83,27 @@ internal static class LPCAnalysisFilterFLP
         /* Set first LPC Order samples to zero instead of undefined */
         for(int i=0; i<Order; i++)
             r_LPC[i] = 0;
+    }
+
+    internal static void SKP_Silk_LPC_analysis_filter6_FLP(
+        float[] r_LPC,
+        float[] PredCoef,
+        float[] s,
+        int s_offset,
+        int length)
+    {
+        for (var ix = 6; ix < length; ix++)
+        {
+            var s_ptr_offset = s_offset + ix - 1;
+            var LPC_pred = s[s_ptr_offset] * PredCoef[0]
+                           + s[s_ptr_offset - 1] * PredCoef[1]
+                           + s[s_ptr_offset - 2] * PredCoef[2]
+                           + s[s_ptr_offset - 3] * PredCoef[3]
+                           + s[s_ptr_offset - 4] * PredCoef[4]
+                           + s[s_ptr_offset - 5] * PredCoef[5];
+
+            r_LPC[ix] = s[s_ptr_offset + 1] - LPC_pred;
+        }
     }
 
     /**

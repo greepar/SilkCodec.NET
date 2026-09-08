@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Portions adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 using System;
 using static SilkCodec.NET.Managed.Define;
 using static SilkCodec.NET.Managed.Macros;
@@ -51,7 +55,7 @@ internal static class FindPitchLagsFLP
             float[] A = new float[         FIND_PITCH_LPC_ORDER_MAX ];
             float[] refl_coef = new float[ FIND_PITCH_LPC_ORDER_MAX ];
             float[] Wsig = new float[      FIND_PITCH_LPC_WIN_MAX ];
-            float thrhld;
+            float thrhld, res_nrg;
             float[] Wsig_ptr;
             int Wsig_ptr_offset;
             int   buf_len;
@@ -101,7 +105,10 @@ internal static class FindPitchLagsFLP
             auto_corr[ 0 ] += auto_corr[ 0 ] * DefineFLP.FIND_PITCH_WHITE_NOISE_FRACTION;
 
             /* Calculate the reflection coefficients using Schur */
-            SchurFLP.SKP_Silk_schur_FLP( refl_coef,0, auto_corr,0, psEnc.sCmn.pitchEstimationLPCOrder );
+            res_nrg = SchurFLP.SKP_Silk_schur_FLP( refl_coef,0, auto_corr,0, psEnc.sCmn.pitchEstimationLPCOrder );
+
+            /* Prediction gain */
+            psEncCtrl.predGain = auto_corr[ 0 ] / Math.Max( res_nrg, 1.0f );
 
             /* Convert reflection coefficients to prediction coefficients */
             K2aFLP.SKP_Silk_k2a_FLP( A, refl_coef, psEnc.sCmn.pitchEstimationLPCOrder );
@@ -118,11 +125,11 @@ internal static class FindPitchLagsFLP
                 res[i_djinn] = 0;
 
             /* Threshold for pitch estimator */
-            thrhld  = 0.5f;
+            thrhld  = 0.45f;
             thrhld -= 0.004f * psEnc.sCmn.pitchEstimationLPCOrder;
-            thrhld -= 0.1f  * ( float )Math.Sqrt( psEnc.speech_activity );
-            thrhld += 0.14f * psEnc.sCmn.prev_sigtype;
-            thrhld -= 0.12f * psEncCtrl.input_tilt;
+            thrhld -= 0.1f  * psEnc.speech_activity;
+            thrhld += 0.15f * psEnc.sCmn.prev_sigtype;
+            thrhld -= 0.1f  * psEncCtrl.input_tilt;
 
             /*****************************************/
             /* Call Pitch estimator */

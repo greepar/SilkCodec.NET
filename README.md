@@ -53,4 +53,4 @@ Legacy SILK is a mono speech codec with a maximum 24 kHz internal sample rate (a
 
 ## Upstream Reference
 
-The managed SILK codec implementation in this project is based on the SILK implementation from [Jitsi/libjitsi](https://github.com/jitsi/libjitsi), licensed under the Apache License 2.0.
+The managed SILK codec implementation in this project is based on the SILK implementation from [Jitsi/libjitsi](https://github.com/jitsi/libjitsi), licensed under the Apache License 2.0. Warped noise shaping and related encoder behavior were adapted from the SILK SDK 1.0.9 reference implementation, licensed under the BSD 3-Clause Clear License. See `THIRD-PARTY-NOTICES` for details.

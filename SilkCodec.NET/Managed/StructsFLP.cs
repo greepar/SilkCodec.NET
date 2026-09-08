@@ -20,6 +20,11 @@ using static SilkCodec.NET.Managed.Define;
 
 namespace SilkCodec.NET.Managed;
 
+/*
+ * Warped noise shaping control fields adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
+
 /**
  *
  * @author Jing Dai
@@ -301,6 +306,7 @@ internal sealed class SKP_Silk_encoder_control_FLP
 
     /* Measures */
     internal float                   sparseness;
+    internal float                   predGain;
     internal float                   LTPredCodGain;
     internal float[]                   input_quality_bands = new float[ VAD_N_BANDS ];
     internal float                   input_tilt;

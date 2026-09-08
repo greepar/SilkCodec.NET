@@ -20,6 +20,11 @@ using static SilkCodec.NET.Managed.Define;
 
 namespace SilkCodec.NET.Managed;
 
+/*
+ * Warped noise shaping state fields adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
+
 /**
  *
  * @author Jing Dai
@@ -48,7 +53,7 @@ internal sealed class SKP_Silk_nsq_state
 {
     internal short[] xq = new short[2 * MAX_FRAME_LENGTH]; /* Buffer for quantized output signal */
     internal int[]   sLTP_shp_Q10 = new int[ 2 * MAX_FRAME_LENGTH ];
-    internal int[]   sLPC_Q14 = new int[ MAX_FRAME_LENGTH / NB_SUBFR + MAX_LPC_ORDER ];
+    internal int[]   sLPC_Q14 = new int[ MAX_FRAME_LENGTH / NB_SUBFR + NSQ_LPC_BUF_LENGTH() ];
     internal int[]   sAR2_Q14 = new int[ SHAPE_LPC_ORDER_MAX ];
     internal int     sLF_AR_shp_Q12;
     internal int     lagPrev;
@@ -61,10 +66,14 @@ internal sealed class SKP_Silk_nsq_state
     /**
      * override clone mthod.
      */
-    //TODO:
-        public object clone()
+    public object clone()
     {
-        return MemberwiseClone();
+        var copy = (SKP_Silk_nsq_state)MemberwiseClone();
+        copy.xq = (short[])xq.Clone();
+        copy.sLTP_shp_Q10 = (int[])sLTP_shp_Q10.Clone();
+        copy.sLPC_Q14 = (int[])sLPC_Q14.Clone();
+        copy.sAR2_Q14 = (int[])sAR2_Q14.Clone();
+        return copy;
     }
 
     /**
@@ -267,6 +276,7 @@ internal sealed class SKP_Silk_encoder_state
     internal int                         subfr_length;                   /* Subframe length (samples)                                            */
     internal int                         la_pitch;                       /* Look-ahead for pitch analysis (samples)                              */
     internal int                         la_shape;                       /* Look-ahead for noise shape analysis (samples)                        */
+    internal int                         shapeWinLength;                 /* Window length for noise shape analysis (samples)                     */
     internal int                         TargetRate_bps;                 /* Target bitrate (bps)                                                 */
     internal int                         PacketSize_ms;                  /* Number of milliseconds to put input each packet                         */
     internal int                         PacketLoss_perc;                /* Packet loss rate measured by farend                                  */
@@ -275,6 +285,7 @@ internal sealed class SKP_Silk_encoder_state
     internal int                         nStatesDelayedDecision;         /* Number of states input delayed decision quantization                    */
     internal int                         useInterpolatedNLSFs;           /* Flag for using NLSF interpolation                                    */
     internal int                         shapingLPCOrder;                /* Filter order for noise shaping filters                               */
+    internal int                         warping_Q16;                    /* Warping parameter for warped noise shaping                           */
     internal int                         predictLPCOrder;                /* Filter order for prediction filters                                  */
     internal int                         pitchEstimationComplexity;      /* Complexity level for pitch estimator                                 */
     internal int                         pitchEstimationLPCOrder;        /* Whitening filter order for pitch estimator                           */

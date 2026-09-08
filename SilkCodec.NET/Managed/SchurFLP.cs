@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Residual-energy behavior adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 
 using System;
 using System.Diagnostics;
@@ -33,7 +37,7 @@ internal static class SchurFLP
      * @param auto_corr_offset offset of valid data.
      * @param order order
      */
-    internal static void SKP_Silk_schur_FLP(
+    internal static float SKP_Silk_schur_FLP(
             float[] refl_coef,        /* O    reflection coefficients (length order)      */
             int ref1_coef_offset,
             float[] auto_corr,        /* I    autotcorreation sequence (length order+1)   */
@@ -68,5 +72,7 @@ internal static class SchurFLP
                 C[n][1] = Ctmp2 + Ctmp1 * rc_tmp;
             }
         }
+
+        return C[0][1];
     }
 }

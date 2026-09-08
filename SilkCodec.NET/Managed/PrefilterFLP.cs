@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Warped LPC analysis filtering adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 using System;
 using static SilkCodec.NET.Managed.Define;
 using static SilkCodec.NET.Managed.Macros;
@@ -47,14 +51,12 @@ internal static class PrefilterFLP
         int   j, k, lag;
         float HarmShapeGain, Tilt, LF_MA_shp, LF_AR_shp;
         float[] B = new float[ 2 ];
-        float[] AR1_shp = new float[ NB_SUBFR * SHAPE_LPC_ORDER_MAX ];
         float[] px;
         int px_offset;
         float[] pxw, pst_res;
         int pxw_offset;
-        int pst_res_offset;
         float[] HarmShapeFIR = new float[ 3 ];
-        float[] st_res = new float[ MAX_FRAME_LENGTH / NB_SUBFR + MAX_LPC_ORDER ];
+        float[] st_res = new float[ MAX_FRAME_LENGTH / NB_SUBFR ];
 
         /* Setup pointers */
         px  = x;
@@ -78,20 +80,13 @@ internal static class PrefilterFLP
             Tilt      =  psEncCtrl.Tilt[ k ];
             LF_MA_shp =  psEncCtrl.LF_MA_shp[ k ];
             LF_AR_shp =  psEncCtrl.LF_AR_shp[ k ];
-//TODO: copy the psEncCtrl.AR1 to a local buffer or use a reference(pointer) to the struct???
-//            AR1_shp   = psEncCtrl.AR1;
-//            AR1_shp_offset = k * SHAPE_LPC_ORDER_MAX;
-            EncoderCompat.Fill(AR1_shp, 0);
-            Array.Copy(psEncCtrl.AR1,  k * SHAPE_LPC_ORDER_MAX,
-                    AR1_shp, 0, psEncCtrl.AR1.Length-k * SHAPE_LPC_ORDER_MAX);
-
-            /* Short term FIR filtering*/
-            LPCAnalysisFilterFLP.SKP_Silk_LPC_analysis_filter_FLP( st_res, AR1_shp,
-                    px, px_offset - psEnc.sCmn.shapingLPCOrder,
-                    psEnc.sCmn.subfr_length + psEnc.sCmn.shapingLPCOrder, psEnc.sCmn.shapingLPCOrder );
+            /* Stateful warped short-term analysis filtering. */
+            SKP_Silk_warped_LPC_analysis_filter_FLP( P.sAR_shp1, st_res, 0,
+                psEncCtrl.AR1, k * SHAPE_LPC_ORDER_MAX, px, px_offset,
+                psEnc.sCmn.warping_Q16 / 65536.0f, psEnc.sCmn.subfr_length, psEnc.sCmn.shapingLPCOrder );
 
             pst_res = st_res;
-            pst_res_offset = psEnc.sCmn.shapingLPCOrder; // Point to first sample
+            int pst_res_offset = 0;
 
             /* reduce (mainly) low frequencies during harmonic emphasis */
             B[ 0 ] =  psEncCtrl.GainsPre[ k ];
@@ -110,6 +105,33 @@ internal static class PrefilterFLP
             pxw_offset += psEnc.sCmn.subfr_length;
         }
         P.lagPrev = psEncCtrl.sCmn.pitchL[ NB_SUBFR - 1 ];
+    }
+
+    internal static void SKP_Silk_warped_LPC_analysis_filter_FLP(
+        float[] state, float[] res, int res_offset, float[] coef, int coef_offset,
+        float[] input, int input_offset, float lambda, int length, int order )
+    {
+        EncoderCompat.Assert( ( order & 1 ) == 0 );
+        for( int n = 0; n < length; n++ )
+        {
+            float tmp2 = state[ 0 ] + lambda * state[ 1 ];
+            state[ 0 ] = input[ input_offset + n ];
+            float tmp1 = state[ 1 ] + lambda * ( state[ 2 ] - tmp2 );
+            state[ 1 ] = tmp2;
+            float acc = coef[ coef_offset ] * tmp2;
+            for( int i = 2; i < order; i += 2 )
+            {
+                tmp2 = state[ i ] + lambda * ( state[ i + 1 ] - tmp1 );
+                state[ i ] = tmp1;
+                acc += coef[ coef_offset + i - 1 ] * tmp1;
+                tmp1 = state[ i + 1 ] + lambda * ( state[ i + 2 ] - tmp2 );
+                state[ i + 1 ] = tmp2;
+                acc += coef[ coef_offset + i ] * tmp2;
+            }
+            state[ order ] = tmp1;
+            acc += coef[ coef_offset + order - 1 ] * tmp1;
+            res[ res_offset + n ] = input[ input_offset + n ] - acc;
+        }
     }
 
     /**

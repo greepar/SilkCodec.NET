@@ -19,6 +19,10 @@ namespace SilkCodec.NET.Managed;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Warped NSQ dispatch and conversion behavior adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 /**
  *
  * @author Jing Dai
@@ -197,9 +201,17 @@ internal static class WrappersFLP
 
         /* Convert control struct to fix control struct */
         /* Noise shape parameters */
-        for( i = 0; i < NB_SUBFR * SHAPE_LPC_ORDER_MAX; i++ )
+        for( i = 0; i < NB_SUBFR; i++ )
         {
-            AR2_Q13[ i ] = (short)SigProcFIX.SKP_SAT16( SigProcFLP.SKP_float2int( psEncCtrl.AR2[ i ] * 8192.0f ) );
+            for( j = 0; j < psEnc.sCmn.shapingLPCOrder; j++ )
+            {
+                AR2_Q13[ i * SHAPE_LPC_ORDER_MAX + j ] = (short)SigProcFLP.SKP_float2int(
+                    psEncCtrl.AR2[ i * SHAPE_LPC_ORDER_MAX + j ] * 8192.0f );
+            }
+            for( ; j < SHAPE_LPC_ORDER_MAX; j++ )
+            {
+                AR2_Q13[ i * SHAPE_LPC_ORDER_MAX + j ] = 0;
+            }
         }
 
         /*TEST************************************************************************/
@@ -356,9 +368,13 @@ internal static class WrappersFLP
 
         for( j = 0; j < NB_SUBFR >> 1; j++ )
         {
-            for( i = 0; i < MAX_LPC_ORDER; i++ )
+            for( i = 0; i < psEnc.sCmn.predictLPCOrder; i++ )
             {
                 PredCoef_Q12[ j ][ i ] = ( short )SigProcFLP.SKP_float2int( psEncCtrl.PredCoef[ j ][ i ] * 4096.0f );
+            }
+            for( ; i < MAX_LPC_ORDER; i++ )
+            {
+                PredCoef_Q12[ j ][ i ] = 0;
             }
         }
 
@@ -526,34 +542,28 @@ internal static class WrappersFLP
             PredCoef_Q12_offset += PredCoef_Q12[PredCoef_Q12_i].Length;
         }
         byte[] qTarget = q_offset == 0 ? q : new byte[psEnc.sCmn.frame_length];
-        if( useLBRR!=0 )
+        SKP_Silk_nsq_state nsq = useLBRR != 0 ? psEnc.sNSQ_LBRR : psEnc.sNSQ;
+        if( UsesDelayedDecision( psEnc.sCmn ) )
         {
-//            psEnc.NoiseShapingQuantizer( psEnc.sCmn, psEncCtrl.sCmn, psEnc.sNSQ_LBRR,
-//                x_16, q, psEncCtrl.sCmn.NLSFInterpCoef_Q2, PredCoef_Q12[ 0 ], LTPCoef_Q14, AR2_Q13,
-//                HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );\
-               psEnc.NoiseShapingQuantizer( psEnc.sCmn, psEncCtrl.sCmn, psEnc.sNSQ_LBRR,
-                     x_16, qTarget, psEncCtrl.sCmn.NLSFInterpCoef_Q2, PredCoef_Q12_dim1_tmp, LTPCoef_Q14, AR2_Q13,
-                    HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
-//             psEnc.NoiseShapingQuantizer( &psEnc->sCmn, &psEncCtrl->sCmn, &psEnc->sNSQ_LBRR,
-//          x_16, q, psEncCtrl->sCmn.NLSFInterpCoef_Q2, PredCoef_Q12[ 0 ], LTPCoef_Q14, AR2_Q13,
-//          HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
+            NSQDelDec.SKP_Silk_NSQ_del_dec( psEnc.sCmn, psEncCtrl.sCmn, nsq,
+                x_16, qTarget, psEncCtrl.sCmn.NLSFInterpCoef_Q2, PredCoef_Q12_dim1_tmp, LTPCoef_Q14, AR2_Q13,
+                HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
         }
         else
         {
-//            psEnc.NoiseShapingQuantizer( psEnc.sCmn, psEncCtrl.sCmn, psEnc.sNSQ,
-//                x_16, q, psEncCtrl.sCmn.NLSFInterpCoef_Q2, PredCoef_Q12[ 0 ], LTPCoef_Q14, AR2_Q13,
-//                HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
-               psEnc.NoiseShapingQuantizer( psEnc.sCmn, psEncCtrl.sCmn, psEnc.sNSQ,
-                     x_16, qTarget, psEncCtrl.sCmn.NLSFInterpCoef_Q2, PredCoef_Q12_dim1_tmp, LTPCoef_Q14, AR2_Q13,
-                    HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
-//               psEnc.NoiseShapingQuantizer( &psEnc->sCmn, &psEncCtrl->sCmn, &psEnc->sNSQ,
-//                    x_16, q, psEncCtrl->sCmn.NLSFInterpCoef_Q2, PredCoef_Q12[ 0 ], LTPCoef_Q14, AR2_Q13,
-//                    HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
+            NSQ.SKP_Silk_NSQ( psEnc.sCmn, psEncCtrl.sCmn, nsq,
+                x_16, qTarget, psEncCtrl.sCmn.NLSFInterpCoef_Q2, PredCoef_Q12_dim1_tmp, LTPCoef_Q14, AR2_Q13,
+                HarmShapeGain_Q14, Tilt_Q14, LF_shp_Q14, Gains_Q16, Lambda_Q10, LTP_scale_Q14 );
         }
 
         if (q_offset != 0)
         {
             Array.Copy(qTarget, 0, q, q_offset, psEnc.sCmn.frame_length);
         }
+    }
+
+    internal static bool UsesDelayedDecision( SKP_Silk_encoder_state state )
+    {
+        return state.nStatesDelayedDecision > 1 || state.warping_Q16 > 0;
     }
 }

@@ -19,6 +19,11 @@ using System.Numerics;
 
 namespace SilkCodec.NET.Managed;
 
+/*
+ * Warped noise shaping constants adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
+
 /**
  *
  * @author Jing Dai
@@ -87,4 +92,13 @@ internal static class DefineFLP
     internal static float LBRR_SPEECH_ACTIVITY_THRES =                           0.5f;
 
     internal const float Q14_CONVERSION_FAC =                             6.1035e-005f; // 1 / 2^14
+
+    internal const float WARPING_MULTIPLIER =                             0.015f;
+
+    internal const float LAMBDA_OFFSET =                                  1.2f;
+    internal const float LAMBDA_SPEECH_ACT =                              -0.3f;
+    internal const float LAMBDA_DELAYED_DECISIONS =                       -0.05f;
+    internal const float LAMBDA_INPUT_QUALITY =                           -0.2f;
+    internal const float LAMBDA_CODING_QUALITY =                          -0.1f;
+    internal const float LAMBDA_QUANT_OFFSET =                            1.5f;
 }

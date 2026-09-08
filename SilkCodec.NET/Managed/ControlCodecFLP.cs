@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Warped noise shaping portions adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 using System;
 using static SilkCodec.NET.Managed.Define;
 using static SilkCodec.NET.Managed.Macros;
@@ -237,7 +241,7 @@ internal static class ControlCodecFLP {
             short[] x_buf_API_fs_Hz = new short[ ( MAX_API_FS_KHZ / 8 ) * ( 2 * MAX_FRAME_LENGTH + LA_SHAPE_MAX ) ];
             short[] x_bufFIX = new short[               2 * MAX_FRAME_LENGTH + LA_SHAPE_MAX ];
 
-            int nSamples_temp = 2 * psEnc.sCmn.frame_length + psEnc.sCmn.la_shape;
+            int nSamples_temp = 2 * psEnc.sCmn.frame_length + LA_SHAPE_MS * psEnc.sCmn.fs_kHz;
 
             SigProcFLP.SKP_float2short_array( x_bufFIX, 0, psEnc.x_buf, 0, 2 * MAX_FRAME_LENGTH + LA_SHAPE_MAX );
 
@@ -356,7 +360,6 @@ internal static class ControlCodecFLP {
             psEnc.sCmn.frame_length   = FRAME_LENGTH_MS * fs_kHz;
             psEnc.sCmn.subfr_length   = psEnc.sCmn.frame_length / NB_SUBFR;
             psEnc.sCmn.la_pitch       = LA_PITCH_MS * fs_kHz;
-            psEnc.sCmn.la_shape       = LA_SHAPE_MS * fs_kHz;
             psEnc.sPred.min_pitch_lag =  3 * fs_kHz;
             psEnc.sPred.max_pitch_lag = 18 * fs_kHz;
             psEnc.sPred.pitch_LPC_win_length = FIND_PITCH_LPC_WIN_MS * fs_kHz;
@@ -403,14 +406,16 @@ internal static class ControlCodecFLP {
             psEnc.sCmn.Complexity                  = 0;
             psEnc.sCmn.pitchEstimationComplexity   = PITCH_EST_COMPLEXITY_LC_MODE;
             psEnc.pitchEstimationThreshold         = DefineFLP.FIND_PITCH_CORRELATION_THRESHOLD_LC_MODE;
-            psEnc.sCmn.pitchEstimationLPCOrder     = 8;
-            psEnc.sCmn.shapingLPCOrder             = 12;
+            psEnc.sCmn.pitchEstimationLPCOrder     = 6;
+            psEnc.sCmn.shapingLPCOrder             = 8;
+            psEnc.sCmn.la_shape                    = 3 * psEnc.sCmn.fs_kHz;
             psEnc.sCmn.nStatesDelayedDecision      = 1;
 //            psEnc.NoiseShapingQuantizer            = SKP_Silk_NSQ;
             psEnc.noiseShapingQuantizerCB          = new NSQImplNSQ();
             psEnc.sCmn.useInterpolatedNLSFs        = 0;
             psEnc.sCmn.LTPQuantLowComplexity       = 1;
             psEnc.sCmn.NLSF_MSVQ_Survivors         = MAX_NLSF_MSVQ_SURVIVORS_LC_MODE;
+            psEnc.sCmn.warping_Q16                  = 0;
         }
         else if( Complexity == 1 )
         {
@@ -419,13 +424,15 @@ internal static class ControlCodecFLP {
             psEnc.sCmn.pitchEstimationComplexity   = PITCH_EST_COMPLEXITY_MC_MODE;
             psEnc.pitchEstimationThreshold         = DefineFLP.FIND_PITCH_CORRELATION_THRESHOLD_MC_MODE;
             psEnc.sCmn.pitchEstimationLPCOrder     = 12;
-            psEnc.sCmn.shapingLPCOrder             = 16;
+            psEnc.sCmn.shapingLPCOrder             = 12;
+            psEnc.sCmn.la_shape                    = 5 * psEnc.sCmn.fs_kHz;
             psEnc.sCmn.nStatesDelayedDecision      = 2;
 //            psEnc.NoiseShapingQuantizer            = SKP_Silk_NSQ_del_dec;
             psEnc.noiseShapingQuantizerCB          = new NSQImplNSQDelDec();
             psEnc.sCmn.useInterpolatedNLSFs        = 0;
             psEnc.sCmn.LTPQuantLowComplexity       = 0;
             psEnc.sCmn.NLSF_MSVQ_Survivors         = MAX_NLSF_MSVQ_SURVIVORS_MC_MODE;
+            psEnc.sCmn.warping_Q16                  = psEnc.sCmn.fs_kHz * SigProcFLP.SKP_float2int( DefineFLP.WARPING_MULTIPLIER * 65536.0f );
         }
         else if( Complexity == 2 )
         {
@@ -435,12 +442,14 @@ internal static class ControlCodecFLP {
             psEnc.pitchEstimationThreshold         = DefineFLP.FIND_PITCH_CORRELATION_THRESHOLD_HC_MODE;
             psEnc.sCmn.pitchEstimationLPCOrder     = 16;
             psEnc.sCmn.shapingLPCOrder             = 16;
+            psEnc.sCmn.la_shape                    = 5 * psEnc.sCmn.fs_kHz;
             psEnc.sCmn.nStatesDelayedDecision      = 4;
 //            psEnc.NoiseShapingQuantizer            = SKP_Silk_NSQ_del_dec;
             psEnc.noiseShapingQuantizerCB          = new NSQImplNSQDelDec();
             psEnc.sCmn.useInterpolatedNLSFs        = 1;
             psEnc.sCmn.LTPQuantLowComplexity       = 0;
             psEnc.sCmn.NLSF_MSVQ_Survivors         = MAX_NLSF_MSVQ_SURVIVORS;
+            psEnc.sCmn.warping_Q16                  = psEnc.sCmn.fs_kHz * SigProcFLP.SKP_float2int( DefineFLP.WARPING_MULTIPLIER * 65536.0f );
         }
         else
         {
@@ -449,10 +458,14 @@ internal static class ControlCodecFLP {
 
         /* Do not allow higher pitch estimation LPC order than predict LPC order */
         psEnc.sCmn.pitchEstimationLPCOrder = Math.Min( psEnc.sCmn.pitchEstimationLPCOrder, psEnc.sCmn.predictLPCOrder );
+        psEnc.sCmn.shapeWinLength = 5 * psEnc.sCmn.fs_kHz + 2 * psEnc.sCmn.la_shape;
 
         EncoderCompat.Assert( psEnc.sCmn.pitchEstimationLPCOrder <= FIND_PITCH_LPC_ORDER_MAX );
         EncoderCompat.Assert( psEnc.sCmn.shapingLPCOrder         <= SHAPE_LPC_ORDER_MAX      );
         EncoderCompat.Assert( psEnc.sCmn.nStatesDelayedDecision  <= DEL_DEC_STATES_MAX       );
+        EncoderCompat.Assert( psEnc.sCmn.warping_Q16             <= 32767                    );
+        EncoderCompat.Assert( psEnc.sCmn.la_shape                <= LA_SHAPE_MAX              );
+        EncoderCompat.Assert( psEnc.sCmn.shapeWinLength          <= SHAPE_LPC_WIN_MAX         );
 
         /* Set bitrate/coding quality */
         TargetRate_bps = Math.Min( TargetRate_bps, 100000 );

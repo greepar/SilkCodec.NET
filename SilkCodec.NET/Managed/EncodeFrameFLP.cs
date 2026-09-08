@@ -20,6 +20,11 @@ using static SilkCodec.NET.Managed.Typedef;
 
 namespace SilkCodec.NET.Managed;
 
+/*
+ * Frame lookahead handling aligned with SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
+
 
 /**
  * Encode frame.
@@ -274,7 +279,7 @@ internal static class EncodeFrameFLP
         /*******************************************/
         /* Copy new frame to front of input buffer */
         /*******************************************/
-        SigProcFLP.SKP_short2float_array( x_frame, x_frame_offset +psEnc.sCmn.la_shape,
+        SigProcFLP.SKP_short2float_array( x_frame, x_frame_offset + LA_SHAPE_MS * psEnc.sCmn.fs_kHz,
                 pIn_HP_LP, 0, psEnc.sCmn.frame_length );
 
 ///*TEST****************************************************************************/
@@ -335,7 +340,7 @@ internal static class EncodeFrameFLP
 
         /* Add tiny signal to avoid high CPU load from denormalized floating point numbers */
         for( k = 0; k < 8; k++ ) {
-            x_frame[ x_frame_offset + psEnc.sCmn.la_shape + k * ( psEnc.sCmn.frame_length >> 3 ) ] += ( 1 - ( k & 2 ) ) * 1e-6f;
+            x_frame[ x_frame_offset + LA_SHAPE_MS * psEnc.sCmn.fs_kHz + k * ( psEnc.sCmn.frame_length >> 3 ) ] += ( 1 - ( k & 2 ) ) * 1e-6f;
         }
 /*TEST****************************************************************************/
         /**
@@ -473,7 +478,7 @@ internal static class EncodeFrameFLP
         /****************************************/
         /* Update input buffer */
         Array.Copy(psEnc.x_buf, psEnc.x_buf_offset + psEnc.sCmn.frame_length,
-                psEnc.x_buf, psEnc.x_buf_offset, psEnc.sCmn.frame_length + psEnc.sCmn.la_shape);
+                psEnc.x_buf, psEnc.x_buf_offset, psEnc.sCmn.frame_length + LA_SHAPE_MS * psEnc.sCmn.fs_kHz);
 
         /* Parameters needed for next frame */
         psEnc.sCmn.prev_sigtype = sEncCtrl.sCmn.sigtype;

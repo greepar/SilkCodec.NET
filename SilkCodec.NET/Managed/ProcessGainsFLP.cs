@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Quantizer lambda calculation adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 using System;
 using static SilkCodec.NET.Managed.Define;
 using static SilkCodec.NET.Managed.Macros;
@@ -40,7 +44,7 @@ internal static class ProcessGainsFLP
         SKP_Silk_shape_state_FLP psShapeSt = psEnc.sShape;
         int     k;
         int[] pGains_Q16 = new int[ NB_SUBFR ];
-        float   s, InvMaxSqrVal, gain;
+        float   s, InvMaxSqrVal, gain, quant_offset;
 
         /* Gain reduction when LTP coding gain is high */
         if( psEncCtrl.sCmn.sigtype == SIG_TYPE_VOICED ) {
@@ -86,19 +90,15 @@ internal static class ProcessGainsFLP
         }
 
         /* Quantizer boundary adjustment */
-        if( psEncCtrl.sCmn.sigtype == SIG_TYPE_VOICED ) {
-            psEncCtrl.Lambda = 1.2f - 0.4f * psEnc.speech_activity
-                                     - 0.3f * psEncCtrl.input_quality
-                                     + 0.2f * psEncCtrl.sCmn.QuantOffsetType
-                                     - 0.1f * psEncCtrl.coding_quality;
-        } else {
-            psEncCtrl.Lambda = 1.2f - 0.4f * psEnc.speech_activity
-                                     - 0.4f * psEncCtrl.input_quality
-                                     + 0.4f * psEncCtrl.sCmn.QuantOffsetType
-                                     - 0.1f * psEncCtrl.coding_quality;
-        }
+        quant_offset = TablesOther.SKP_Silk_Quantization_Offsets_Q10[ psEncCtrl.sCmn.sigtype ][ psEncCtrl.sCmn.QuantOffsetType ] / 1024.0f;
+        psEncCtrl.Lambda = DefineFLP.LAMBDA_OFFSET
+                         + DefineFLP.LAMBDA_DELAYED_DECISIONS * psEnc.sCmn.nStatesDelayedDecision
+                         + DefineFLP.LAMBDA_SPEECH_ACT * psEnc.speech_activity
+                         + DefineFLP.LAMBDA_INPUT_QUALITY * psEncCtrl.input_quality
+                         + DefineFLP.LAMBDA_CODING_QUALITY * psEncCtrl.coding_quality
+                         + DefineFLP.LAMBDA_QUANT_OFFSET * quant_offset;
 
-        EncoderCompat.Assert( psEncCtrl.Lambda >= 0.0f );
+        EncoderCompat.Assert( psEncCtrl.Lambda >  0.0f );
         EncoderCompat.Assert( psEncCtrl.Lambda <  2.0f );
     }
 }

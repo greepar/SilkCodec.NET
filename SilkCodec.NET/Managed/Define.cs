@@ -19,6 +19,11 @@ using System.Numerics;
 
 namespace SilkCodec.NET.Managed;
 
+/*
+ * Pitch analysis timing aligned with SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
+
 /**
  * This class contains a number of defines that controls the operation of SILK.
  * Most of these should be left alone for ensuring proper operation. However, a
@@ -113,7 +118,7 @@ internal static class Define
     internal const int MAX_FRAME_LENGTH =                       (FRAME_LENGTH_MS * MAX_FS_KHZ);
 
     /* Milliseconds of lookahead for pitch analysis */
-    internal const int LA_PITCH_MS =                            3;
+    internal const int LA_PITCH_MS =                            2;
     internal const int LA_PITCH_MAX =                           (LA_PITCH_MS * MAX_FS_KHZ);
 
     /* Milliseconds of lookahead for noise shape analysis */
@@ -124,7 +129,7 @@ internal static class Define
     internal const int FIND_PITCH_LPC_ORDER_MAX =               16;
 
     /* Length of LPC window used input find pitch */
-    internal const int FIND_PITCH_LPC_WIN_MS =                  (30 + (LA_PITCH_MS << 1));
+    internal const int FIND_PITCH_LPC_WIN_MS =                  (20 + (LA_PITCH_MS << 1));
     internal const int FIND_PITCH_LPC_WIN_MAX =                 (FIND_PITCH_LPC_WIN_MS * MAX_FS_KHZ);
 
     internal const int PITCH_EST_COMPLEXITY_HC_MODE =           SigProcFIX.SKP_Silk_PITCH_EST_MAX_COMPLEX;

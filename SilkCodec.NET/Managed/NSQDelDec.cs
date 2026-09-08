@@ -19,6 +19,10 @@ namespace SilkCodec.NET.Managed;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Warped delayed-decision noise shaping adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 /**
  *
  * @author Dingxin Xu
@@ -31,6 +35,7 @@ internal class NSQDelDecStruct
     internal int[] Pred_Q16  = new int[ DECISION_DELAY ];
     internal int[] Shape_Q10 = new int[ DECISION_DELAY ];
     internal int[] Gain_Q16  = new int[ DECISION_DELAY ];
+    internal int[] sAR2_Q14  = new int[ SHAPE_LPC_ORDER_MAX ];
     internal int[] sLPC_Q14  = new int[ MAX_FRAME_LENGTH / NB_SUBFR + NSQ_LPC_BUF_LENGTH() ];
     internal int LF_AR_Q12;
     internal int Seed;
@@ -44,6 +49,7 @@ internal class NSQDelDecStruct
         Array.Fill(this.Pred_Q16, 0);
         Array.Fill(this.Shape_Q10, 0);
         Array.Fill(this.Gain_Q16, 0);
+        Array.Fill(this.sAR2_Q14, 0);
         Array.Fill(this.sLPC_Q14, 0);
         this.LF_AR_Q12 = 0;
         this.Seed = 0;
@@ -148,6 +154,7 @@ internal class NSQDelDec
             psDD.Shape_Q10[ 0 ] = NSQ.sLTP_shp_Q10[ psEncC.frame_length - 1 ];
 //            SKP_memcpy( psDD.sLPC_Q14, NSQ.sLPC_Q14, NSQ_LPC_BUF_LENGTH * sizeof( SKP_int32 ) );
             Array.Copy(NSQ.sLPC_Q14, 0, psDD.sLPC_Q14, 0, NSQ_LPC_BUF_LENGTH());
+            Array.Copy(NSQ.sAR2_Q14, 0, psDD.sAR2_Q14, 0, SHAPE_LPC_ORDER_MAX);
         }
 
         offset_Q10   = TablesOther.SKP_Silk_Quantization_Offsets_Q10[ psEncCtrlC.sigtype ][ psEncCtrlC.QuantOffsetType ];
@@ -161,6 +168,8 @@ internal class NSQDelDec
                 decisionDelay = ( decisionDelay < (psEncCtrlC.pitchL[ k ] - LTP_ORDER / 2 - 1) ?
                         decisionDelay:(psEncCtrlC.pitchL[ k ] - LTP_ORDER / 2 - 1));
             }
+        } else if( lag > 0 ) {
+            decisionDelay = Math.Min( decisionDelay, lag - LTP_ORDER / 2 - 1 );
         }
 
         if( LSFInterpFactor_Q2 == ( 1 << 2 ) ) {
@@ -230,7 +239,8 @@ internal class NSQDelDec
 
                     /* Rewhiten with new A coefs */
                     start_idx = psEncC.frame_length - lag - psEncC.predictLPCOrder - LTP_ORDER / 2;
-                    start_idx = SigProcFIX.SKP_LIMIT_int( start_idx, 0, psEncC.frame_length - psEncC.predictLPCOrder );
+                    System.Diagnostics.Debug.Assert( start_idx >= 0 );
+                    System.Diagnostics.Debug.Assert( start_idx <= psEncC.frame_length - psEncC.predictLPCOrder );
 
 //                    SKP_memset( FiltState, 0, psEncC.predictLPCOrder * sizeof( SKP_int32 ) );
                     Array.Fill(FiltState, 0, 0, psEncC.predictLPCOrder);
@@ -256,7 +266,7 @@ internal class NSQDelDec
             SKP_Silk_noise_shape_quantizer_del_dec( NSQ, psDelDec, psEncCtrlC.sigtype, x_sc_Q10, q_tmp, q_tmp_offset, pxq, pxq_offset,
                     sLTP_Q16, A_Q12, A_Q12_offset, B_Q14, B_Q14_offset, AR_shp_Q13, AR_shp_Q13_offset, lag, HarmShapeFIRPacked_Q14, Tilt_Q14[ k ],
                     LF_shp_Q14[ k ], Gains_Q16[ k ], Lambda_Q10, offset_Q10, psEncC.subfr_length, subfr++, psEncC.shapingLPCOrder, psEncC.predictLPCOrder,
-                psEncC.nStatesDelayedDecision, smpl_buf_idx_ptr, decisionDelay );
+                psEncC.warping_Q16, psEncC.nStatesDelayedDecision, smpl_buf_idx_ptr, decisionDelay );
             smpl_buf_idx = smpl_buf_idx_ptr[0];
 
             x_tmp_offset   += psEncC.subfr_length;
@@ -289,6 +299,7 @@ internal class NSQDelDec
         }
 //        SKP_memcpy( NSQ.sLPC_Q14, &psDD.sLPC_Q14[ psEncC.subfr_length ], NSQ_LPC_BUF_LENGTH * sizeof( SKP_int32 ) );
         Array.Copy(psDD.sLPC_Q14, psEncC.subfr_length, NSQ.sLPC_Q14, 0, NSQ_LPC_BUF_LENGTH());
+        Array.Copy(psDD.sAR2_Q14, 0, NSQ.sAR2_Q14, 0, SHAPE_LPC_ORDER_MAX);
 
         /* Update states */
         NSQ.sLF_AR_shp_Q12    = psDD.LF_AR_Q12;
@@ -362,6 +373,7 @@ internal class NSQDelDec
         int                 subfr,                  /* I    Subframe number                     */
         int                 shapingLPCOrder,        /* I    Shaping LPC filter order            */
         int                 predictLPCOrder,        /* I    Prediction LPC filter order         */
+        int                 warping_Q16,            /* I    Warping parameter                   */
         int                 nStatesDelayedDecision, /* I    Number of states input decision tree   */
         int                 []smpl_buf_idx,          /* I    Index to newest samples input buffers  */
         int                 decisionDelay           /* I                                        */
@@ -375,7 +387,7 @@ internal class NSQDelDec
         int   q1_Q10, q2_Q10;
         int   dither;
         int   exc_Q10, LPC_exc_Q10, xq_Q10;
-        int   tmp, sLF_AR_shp_Q10;
+        int   tmp, tmp1, tmp2, sLF_AR_shp_Q10;
         int[] pred_lag_ptr, shp_lag_ptr;
         int   pred_lag_ptr_offset, shp_lag_ptr_offset;
         int   []psLPC_Q14; int psLPC_Q14_offset;
@@ -467,26 +479,21 @@ internal class NSQDelDec
                 }
 
                 /* Noise shape feedback */
-                System.Diagnostics.Debug.Assert( ( shapingLPCOrder       & 1 ) == 0 );   /* check that order is even */
-//                System.Diagnostics.Debug.Assert( ( (SKP_int64)AR_shp_Q13 & 3 ) == 0 );   /* check that array starts at 4-byte aligned address */
-                System.Diagnostics.Debug.Assert( shapingLPCOrder >= 12 );                /* check that unrolling works */
-                /* Partially unrolled */
-                n_AR_Q10 = SKP_SMULWB(           psLPC_Q14[  psLPC_Q14_offset+0 ], AR_shp_Q13[  AR_shp_Q13_offset+0 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-1 ], AR_shp_Q13[  AR_shp_Q13_offset+1 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-2 ], AR_shp_Q13[  AR_shp_Q13_offset+2 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-3 ], AR_shp_Q13[  AR_shp_Q13_offset+3 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-4 ], AR_shp_Q13[  AR_shp_Q13_offset+4 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-5 ], AR_shp_Q13[  AR_shp_Q13_offset+5 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-6 ], AR_shp_Q13[  AR_shp_Q13_offset+6 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-7 ], AR_shp_Q13[  AR_shp_Q13_offset+7 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-8 ], AR_shp_Q13[  AR_shp_Q13_offset+8 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-9 ], AR_shp_Q13[  AR_shp_Q13_offset+9 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-10 ],AR_shp_Q13[  AR_shp_Q13_offset+10 ] );
-                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[  psLPC_Q14_offset-11 ],AR_shp_Q13[  AR_shp_Q13_offset+11 ] );
-
-                for( j = 12; j < shapingLPCOrder; j ++ ) {
-                    n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, psLPC_Q14[ psLPC_Q14_offset-j ], AR_shp_Q13[ AR_shp_Q13_offset+j ] );
+                System.Diagnostics.Debug.Assert( ( shapingLPCOrder & 1 ) == 0 );
+                tmp2 = SKP_SMLAWB( psLPC_Q14[ psLPC_Q14_offset ], psDD.sAR2_Q14[ 0 ], warping_Q16 );
+                tmp1 = SKP_SMLAWB( psDD.sAR2_Q14[ 0 ], psDD.sAR2_Q14[ 1 ] - tmp2, warping_Q16 );
+                psDD.sAR2_Q14[ 0 ] = tmp2;
+                n_AR_Q10 = SKP_SMULWB( tmp2, AR_shp_Q13[ AR_shp_Q13_offset ] );
+                for( j = 2; j < shapingLPCOrder; j += 2 ) {
+                    tmp2 = SKP_SMLAWB( psDD.sAR2_Q14[ j - 1 ], psDD.sAR2_Q14[ j ] - tmp1, warping_Q16 );
+                    psDD.sAR2_Q14[ j - 1 ] = tmp1;
+                    n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, tmp1, AR_shp_Q13[ AR_shp_Q13_offset + j - 1 ] );
+                    tmp1 = SKP_SMLAWB( psDD.sAR2_Q14[ j ], psDD.sAR2_Q14[ j + 1 ] - tmp2, warping_Q16 );
+                    psDD.sAR2_Q14[ j ] = tmp2;
+                    n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, tmp2, AR_shp_Q13[ AR_shp_Q13_offset + j ] );
                 }
+                psDD.sAR2_Q14[ shapingLPCOrder - 1 ] = tmp1;
+                n_AR_Q10 = SKP_SMLAWB( n_AR_Q10, tmp1, AR_shp_Q13[ AR_shp_Q13_offset + shapingLPCOrder - 1 ] );
 
 //                n_AR_Q10 = SKP_RSHIFT( n_AR_Q10, 1 );           /* Q11 -> Q10 */
                 n_AR_Q10 = ( n_AR_Q10 >> 1 );           /* Q11 -> Q10 */
@@ -498,7 +505,7 @@ internal class NSQDelDec
                 /* Input minus prediction plus noise feedback                       */
                 /* r = x[ i ] - LTP_pred - LPC_pred + n_AR + n_Tilt + n_LF + n_LTP  */
                 tmp   = ( LTP_pred_Q14 - n_LTP_Q14 );                       /* Add Q14 stuff */
-                tmp   = SigProcFIX.SKP_RSHIFT_ROUND( tmp, 4 );                                 /* round to Q10  */
+                tmp >>= 4;
                 tmp   = ( tmp + LPC_pred_Q10 );                             /* add Q10 stuff */
                 tmp   = ( tmp - n_AR_Q10 );                                 /* subtract Q10 stuff */
                 tmp   = ( tmp - n_LF_Q10 );                                 /* subtract Q10 stuff */
@@ -701,11 +708,11 @@ internal class NSQDelDec
             int[] pitchL      /* I    Pitch lag                           */
     )
     {
-        int            i, k, scale_length, lag;
+        int            i, k, lag;
         int            inv_gain_Q16, gain_adj_Q16, inv_gain_Q32;
         NSQDelDecStruct psDD;
 
-        inv_gain_Q16 = int.MaxValue / (Gains_Q16[subfr] >> 1);
+        inv_gain_Q16 = Inlines.SKP_INVERSE32_varQ( Math.Max( Gains_Q16[subfr], 1 ), 32 );
         inv_gain_Q16 = Math.Min(inv_gain_Q16, short.MaxValue);
         lag          = pitchL[ subfr ];
         /* After rewhitening the LTP state is un-scaled. So scale with inv_gain_Q16 */
@@ -736,6 +743,9 @@ internal class NSQDelDec
                     psDD.sLPC_Q14[ NSQ_LPC_BUF_LENGTH() - i - 1 ] = SKP_SMULWW( gain_adj_Q16,
                             psDD.sLPC_Q14[ NSQ_LPC_BUF_LENGTH() - i - 1 ] );
                 }
+                for( i = 0; i < SHAPE_LPC_ORDER_MAX; i++ ) {
+                    psDD.sAR2_Q14[ i ] = SKP_SMULWW( gain_adj_Q16, psDD.sAR2_Q14[ i ] );
+                }
                 for( i = 0; i < DECISION_DELAY; i++ ) {
                     psDD.Pred_Q16[  i ] = SKP_SMULWW( gain_adj_Q16, psDD.Pred_Q16[  i ] );
                     psDD.Shape_Q10[ i ] = SKP_SMULWW( gain_adj_Q16, psDD.Shape_Q10[ i ] );
@@ -744,12 +754,7 @@ internal class NSQDelDec
 
             /* Scale long term shaping state */
 
-            /* Calculate length to be scaled, Worst case: Next frame is voiced with max lag */
-            scale_length = length * NB_SUBFR;                                               /* aprox max lag */
-            scale_length = scale_length - SKP_SMULBB( NB_SUBFR - ( subfr + 1 ), length );   /* subtract samples that will be too old input next frame */
-            scale_length = Math.Max( scale_length, lag + LTP_ORDER );                    /* make sure to scale whole pitch period if voiced */
-
-            for( i = NSQ.sLTP_shp_buf_idx - scale_length; i < NSQ.sLTP_shp_buf_idx; i++ ) {
+            for( i = NSQ.sLTP_shp_buf_idx - length * NB_SUBFR; i < NSQ.sLTP_shp_buf_idx; i++ ) {
                 NSQ.sLTP_shp_Q10[ i ] = SKP_SMULWW( gain_adj_Q16, NSQ.sLTP_shp_Q10[ i ] );
             }
 
@@ -788,6 +793,7 @@ internal class NSQDelDec
         Array.Copy(DD_src.Pred_Q16, 0, DD_dst.Pred_Q16, 0, DECISION_DELAY);
         Array.Copy(DD_src.Shape_Q10, 0, DD_dst.Shape_Q10, 0, DECISION_DELAY);
         Array.Copy(DD_src.Xq_Q10, 0, DD_dst.Xq_Q10, 0, DECISION_DELAY);
+        Array.Copy(DD_src.sAR2_Q14, 0, DD_dst.sAR2_Q14, 0, SHAPE_LPC_ORDER_MAX);
 
         Array.Copy(DD_src.sLPC_Q14, LPC_state_idx, DD_dst.sLPC_Q14, LPC_state_idx, NSQ_LPC_BUF_LENGTH());
         DD_dst.LF_AR_Q12 = DD_src.LF_AR_Q12;

@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Warped noise shape analysis adapted from SILK SDK 1.0.9.
+ * Copyright (c) 2006-2012, Skype Limited. See THIRD-PARTY-NOTICES.
+ */
 using System;
 using static SilkCodec.NET.Managed.Define;
 using static SilkCodec.NET.Managed.Macros;
@@ -49,8 +53,8 @@ internal static class NoiseShapeAnalysisFLP
         SKP_Silk_shape_state_FLP psShapeSt = psEnc.sShape;
         int     k, nSamples;
         float   SNR_adj_dB, HarmBoost, HarmShapeGain, Tilt;
-        float   nrg, pre_nrg=0, log_energy, log_energy_prev, energy_variation;
-        float   delta, BWExp1, BWExp2, gain_mult, gain_add, strength, b;
+        float   nrg, pre_nrg, log_energy, log_energy_prev, energy_variation;
+        float   delta, BWExp1, BWExp2, gain_mult, gain_add, strength, b, warping;
         float[] x_windowed = new float[ SHAPE_LPC_WIN_MAX ];
         float[] auto_corr = new float[ SHAPE_LPC_ORDER_MAX + 1 ];
         float[] x_ptr, pitch_res_ptr;
@@ -58,7 +62,7 @@ internal static class NoiseShapeAnalysisFLP
 
         /* Point to start of first LPC analysis block */
         x_ptr = x;
-        x_ptr_offset = x_offset + psEnc.sCmn.la_shape - SHAPE_LPC_WIN_MS * psEnc.sCmn.fs_kHz + psEnc.sCmn.subfr_length;
+        x_ptr_offset = x_offset - psEnc.sCmn.la_shape;
 
         /****************/
         /* CONTROL SNR  */
@@ -145,43 +149,64 @@ internal static class NoiseShapeAnalysisFLP
         /*******************************/
         /* Control bandwidth expansion */
         /*******************************/
+        strength = DefineFLP.FIND_PITCH_WHITE_NOISE_FRACTION * psEncCtrl.predGain;
+        BWExp1 = BWExp2 = PerceptualParametersFLP.BANDWIDTH_EXPANSION / ( 1.0f + strength * strength );
         delta  = PerceptualParametersFLP.LOW_RATE_BANDWIDTH_EXPANSION_DELTA * ( 1.0f - 0.75f * psEncCtrl.coding_quality );
-        BWExp1 = PerceptualParametersFLP.BANDWIDTH_EXPANSION - delta;
-        BWExp2 = PerceptualParametersFLP.BANDWIDTH_EXPANSION + delta;
-        if( psEnc.sCmn.fs_kHz == 24 )
-        {
-            /* Less bandwidth expansion for super wideband */
-            BWExp1 = 1.0f - ( 1.0f - BWExp1 ) * PerceptualParametersFLP.SWB_BANDWIDTH_EXPANSION_REDUCTION;
-            BWExp2 = 1.0f - ( 1.0f - BWExp2 ) * PerceptualParametersFLP.SWB_BANDWIDTH_EXPANSION_REDUCTION;
-        }
+        BWExp1 -= delta;
+        BWExp2 += delta;
         /* BWExp1 will be applied after BWExp2, so make it relative */
         BWExp1 /= BWExp2;
+
+        if( psEnc.sCmn.warping_Q16 > 0 )
+        {
+            warping = psEnc.sCmn.warping_Q16 / 65536.0f + 0.01f * psEncCtrl.coding_quality;
+        }
+        else
+        {
+            warping = 0.0f;
+        }
 
         /********************************************/
         /* Compute noise shaping AR coefs and gains */
         /********************************************/
         for( k = 0; k < NB_SUBFR; k++ )
         {
-            /* Apply window */
-            ApplySineWindowFLP.SKP_Silk_apply_sine_window_FLP( x_windowed,0, x_ptr,x_ptr_offset, 0, SHAPE_LPC_WIN_MS * psEnc.sCmn.fs_kHz );
+            /* Apply sine slope, flat part, and cosine slope. */
+            int flat_part = psEnc.sCmn.fs_kHz * 5;
+            int slope_part = ( psEnc.sCmn.shapeWinLength - flat_part ) / 2;
+            ApplySineWindowFLP.SKP_Silk_apply_sine_window_FLP( x_windowed, 0, x_ptr, x_ptr_offset, 1, slope_part );
+            Array.Copy( x_ptr, x_ptr_offset + slope_part, x_windowed, slope_part, flat_part );
+            ApplySineWindowFLP.SKP_Silk_apply_sine_window_FLP( x_windowed, slope_part + flat_part,
+                x_ptr, x_ptr_offset + slope_part + flat_part, 2, slope_part );
 
             /* Update pointer: next LPC analysis block */
             x_ptr_offset += psEnc.sCmn.subfr_length;
 
-            /* Calculate auto correlation */
-            AutocorrelationFLP.SKP_Silk_autocorrelation_FLP(auto_corr,0, x_windowed,0, SHAPE_LPC_WIN_MS * psEnc.sCmn.fs_kHz, psEnc.sCmn.shapingLPCOrder + 1);
+            if( psEnc.sCmn.warping_Q16 > 0 )
+            {
+                WarpedAutocorrelationFLP.SKP_Silk_warped_autocorrelation_FLP( auto_corr, 0, x_windowed, 0,
+                    warping, psEnc.sCmn.shapeWinLength, psEnc.sCmn.shapingLPCOrder );
+            }
+            else
+            {
+                AutocorrelationFLP.SKP_Silk_autocorrelation_FLP( auto_corr, 0, x_windowed, 0,
+                    psEnc.sCmn.shapeWinLength, psEnc.sCmn.shapingLPCOrder + 1 );
+            }
 
             /* Add white noise, as a fraction of energy */
             auto_corr[ 0 ] += auto_corr[ 0 ] * PerceptualParametersFLP.SHAPE_WHITE_NOISE_FRACTION;
 
             /* Convert correlations to prediction coefficients, and compute residual energy */
             nrg = LevinsondurbinFLP.SKP_Silk_levinsondurbin_FLP( psEncCtrl.AR2,k * SHAPE_LPC_ORDER_MAX, auto_corr, psEnc.sCmn.shapingLPCOrder );
+            psEncCtrl.Gains[ k ] = ( float )Math.Sqrt( nrg );
+
+            if( psEnc.sCmn.warping_Q16 > 0 )
+            {
+                psEncCtrl.Gains[ k ] *= warped_gain( psEncCtrl.AR2, k * SHAPE_LPC_ORDER_MAX, warping, psEnc.sCmn.shapingLPCOrder );
+            }
 
             /* Bandwidth expansion for synthesis filter shaping */
             BwexpanderFLP.SKP_Silk_bwexpander_FLP( psEncCtrl.AR2,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder, BWExp2 );
-
-            /* Make sure to fit in Q13 SKP_int16 */
-            LPC_fit_int16( psEncCtrl.AR2,k * SHAPE_LPC_ORDER_MAX, 1.0f, psEnc.sCmn.shapingLPCOrder, 3.999f );
 
             /* Compute noise shaping filter coefficients */
 //            SKP_memcpy(
@@ -194,19 +219,17 @@ internal static class NoiseShapeAnalysisFLP
             /* Bandwidth expansion for analysis filter shaping */
             BwexpanderFLP.SKP_Silk_bwexpander_FLP( psEncCtrl.AR1,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder, BWExp1 );
 
-            /* Increase residual energy */
-            nrg += PerceptualParametersFLP.SHAPE_MIN_ENERGY_RATIO * auto_corr[ 0 ];
-            psEncCtrl.Gains[ k ] = ( float )Math.Sqrt( nrg );
-
             /* Ratio of prediction gains, in energy domain */
-            float[] pre_nrg_djinnaddress = {pre_nrg};
+            float[] pre_nrg_djinnaddress = new float[1];
             LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( pre_nrg_djinnaddress, psEncCtrl.AR2,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder );
             pre_nrg = pre_nrg_djinnaddress[0];
             float[] nrg_djinnaddress = {nrg};
             LPCInvPredGainFLP.SKP_Silk_LPC_inverse_pred_gain_FLP( nrg_djinnaddress,     psEncCtrl.AR1,k * SHAPE_LPC_ORDER_MAX, psEnc.sCmn.shapingLPCOrder );
             nrg = nrg_djinnaddress[0];
-            psEncCtrl.GainsPre[ k ] = ( float )Math.Sqrt( pre_nrg / nrg );
-            //psEncCtrl->GainsPre[ k ] = 1.0f - 0.7f * ( 1.0f - pre_nrg / nrg );
+            psEncCtrl.GainsPre[ k ] = 1.0f - 0.7f * ( 1.0f - pre_nrg / nrg );
+
+            warped_true2monic_coefs( psEncCtrl.AR2, k * SHAPE_LPC_ORDER_MAX,
+                psEncCtrl.AR1, k * SHAPE_LPC_ORDER_MAX, warping, 3.999f, psEnc.sCmn.shapingLPCOrder );
         }
 
         /*****************/
@@ -318,6 +341,85 @@ internal static class NoiseShapeAnalysisFLP
             psShapeSt.Tilt_smth          += PerceptualParametersFLP.SUBFR_SMTH_COEF * ( Tilt - psShapeSt.Tilt_smth );
             psEncCtrl.Tilt[ k ]           = psShapeSt.Tilt_smth;
         }
+    }
+
+    private static float warped_gain( float[] coefs, int offset, float lambda, int order )
+    {
+        lambda = -lambda;
+        float gain = coefs[ offset + order - 1 ];
+        for( int i = order - 2; i >= 0; i-- )
+        {
+            gain = lambda * gain + coefs[ offset + i ];
+        }
+        return 1.0f / ( 1.0f - lambda * gain );
+    }
+
+    private static void warped_true2monic_coefs(
+        float[] coefs_syn, int syn_offset, float[] coefs_ana, int ana_offset,
+        float lambda, float limit, int order )
+    {
+        int ind = 0;
+        for( int i = order - 1; i > 0; i-- )
+        {
+            coefs_syn[ syn_offset + i - 1 ] -= lambda * coefs_syn[ syn_offset + i ];
+            coefs_ana[ ana_offset + i - 1 ] -= lambda * coefs_ana[ ana_offset + i ];
+        }
+        float gain_syn = ( 1.0f - lambda * lambda ) / ( 1.0f + lambda * coefs_syn[ syn_offset ] );
+        float gain_ana = ( 1.0f - lambda * lambda ) / ( 1.0f + lambda * coefs_ana[ ana_offset ] );
+        for( int i = 0; i < order; i++ )
+        {
+            coefs_syn[ syn_offset + i ] *= gain_syn;
+            coefs_ana[ ana_offset + i ] *= gain_ana;
+        }
+
+        for( int iter = 0; iter < 10; iter++ )
+        {
+            float maxabs = -1.0f;
+            for( int i = 0; i < order; i++ )
+            {
+                float value = Math.Max( Math.Abs( coefs_syn[ syn_offset + i ] ), Math.Abs( coefs_ana[ ana_offset + i ] ) );
+                if( value > maxabs )
+                {
+                    maxabs = value;
+                    ind = i;
+                }
+            }
+            if( maxabs <= limit )
+            {
+                return;
+            }
+
+            for( int i = 1; i < order; i++ )
+            {
+                coefs_syn[ syn_offset + i - 1 ] += lambda * coefs_syn[ syn_offset + i ];
+                coefs_ana[ ana_offset + i - 1 ] += lambda * coefs_ana[ ana_offset + i ];
+            }
+            gain_syn = 1.0f / gain_syn;
+            gain_ana = 1.0f / gain_ana;
+            for( int i = 0; i < order; i++ )
+            {
+                coefs_syn[ syn_offset + i ] *= gain_syn;
+                coefs_ana[ ana_offset + i ] *= gain_ana;
+            }
+
+            float chirp = 0.99f - ( 0.8f + 0.1f * iter ) * ( maxabs - limit ) / ( maxabs * ( ind + 1 ) );
+            BwexpanderFLP.SKP_Silk_bwexpander_FLP( coefs_syn, syn_offset, order, chirp );
+            BwexpanderFLP.SKP_Silk_bwexpander_FLP( coefs_ana, ana_offset, order, chirp );
+
+            for( int i = order - 1; i > 0; i-- )
+            {
+                coefs_syn[ syn_offset + i - 1 ] -= lambda * coefs_syn[ syn_offset + i ];
+                coefs_ana[ ana_offset + i - 1 ] -= lambda * coefs_ana[ ana_offset + i ];
+            }
+            gain_syn = ( 1.0f - lambda * lambda ) / ( 1.0f + lambda * coefs_syn[ syn_offset ] );
+            gain_ana = ( 1.0f - lambda * lambda ) / ( 1.0f + lambda * coefs_ana[ ana_offset ] );
+            for( int i = 0; i < order; i++ )
+            {
+                coefs_syn[ syn_offset + i ] *= gain_syn;
+                coefs_ana[ ana_offset + i ] *= gain_ana;
+            }
+        }
+        EncoderCompat.Assert( false );
     }
 
     /**
