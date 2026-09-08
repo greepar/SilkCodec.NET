@@ -37,7 +37,7 @@ Run the console demo and enter an MP3 path when prompted:
 dotnet run --project SilkCodec.NET.Demo
 ```
 
-The demo decodes MP3 with the managed `NLayer` decoder, downmixes it to mono PCM16, and exports Tencent SILK v3 by default. It also prompts for the output path, bitrate, and container format so different quality settings can be compared. The default bitrate is 100 kbps for maximum quality; music should use at least 32 kbps to avoid the encoder switching from 24 kHz super-wideband mode to 16 kHz wideband mode.
+The demo decodes MP3 with the managed `NLayer` decoder, downmixes it to mono PCM16, and exports Tencent SILK v3 by default. Sources above 24 kHz are converted to 24 kHz with a managed band-limited resampler before encoding. The demo also prompts for the output path, bitrate, and container format so different quality settings can be compared. The default bitrate is 100 kbps for maximum quality; music should use at least 32 kbps to avoid the encoder switching from 24 kHz super-wideband mode to 16 kHz wideband mode.
 
 It can also run non-interactively:
 
@@ -47,7 +47,7 @@ dotnet run --project SilkCodec.NET.Demo -- input.mp3 output.silk 100000 tencent 
 
 Use `standard` as the final argument for a standard `#!SILK_V3` stream. Use `tencent` for the common WeChat/QQ-compatible stream with the leading `0x02` byte.
 
-The optional fifth argument is `flat` or `music`. `flat` is the default and preserves the source spectrum as closely as the SILK codec permits. The optional `music` profile applies a gentle 60 Hz high-pass filter and a 2.5 dB presence boost around 4.5 kHz; it sounds brighter but can also emphasize SILK quantization noise, so it is not recommended when faithful reproduction is the priority.
+The optional fifth argument is `flat` or `music`. `flat` is the default and applies only mono downmixing, band-limited resampling, and PCM16 conversion. The optional `music` profile adds an 80 Hz high-pass filter, an approximately 11 kHz low-pass filter, gentle dynamic compression, and a -1 dBFS soft sample-peak limiter. The processing is implemented entirely in managed C# and does not require FFmpeg.
 
 Legacy SILK is a mono speech codec with a maximum 24 kHz internal sample rate (approximately 12 kHz audio bandwidth). Even at high bitrates it cannot preserve stereo or CD-quality music bandwidth; use Opus/AAC when the playback system permits it.
 
