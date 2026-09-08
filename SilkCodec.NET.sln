@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkCodec.NET", "SilkCodec.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkCodec.NET.Tests", "SilkCodec.NET.Tests\SilkCodec.NET.Tests.csproj", "{D64BA343-D97D-4628-B735-E8E972445748}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkCodec.NET.Demo", "SilkCodec.NET.Demo\SilkCodec.NET.Demo.csproj", "{4D92AF60-44C2-4D77-B27C-55A8C3E91B5A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{D64BA343-D97D-4628-B735-E8E972445748}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D64BA343-D97D-4628-B735-E8E972445748}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D64BA343-D97D-4628-B735-E8E972445748}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D92AF60-44C2-4D77-B27C-55A8C3E91B5A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D92AF60-44C2-4D77-B27C-55A8C3E91B5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D92AF60-44C2-4D77-B27C-55A8C3E91B5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D92AF60-44C2-4D77-B27C-55A8C3E91B5A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

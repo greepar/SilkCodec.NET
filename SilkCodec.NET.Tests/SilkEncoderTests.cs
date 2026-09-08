@@ -61,6 +61,17 @@ public sealed class SilkEncoderTests
             $"Maximum bitrate output ({maximum.Length} bytes) unexpectedly fell below the near-maximum output ({nearMaximum.Length} bytes).");
     }
 
+    [Fact]
+    public void MaximumBitRateProducesMoreDataThanFortySixKilobits()
+    {
+        var pcm = CreateSineWave(48_000, 1_000);
+        var fortySixKilobits = EncodeAtBitRate(pcm, 46_000);
+        var maximum = EncodeAtBitRate(pcm, 100_000);
+
+        Assert.True(maximum.Length >= fortySixKilobits.Length * 1.2,
+            $"Maximum bitrate output ({maximum.Length} bytes) did not materially exceed 46 kbps output ({fortySixKilobits.Length} bytes).");
+    }
+
     private static byte[] EncodeAtBitRate(short[] pcm, int bitRate)
     {
         return new SilkEncoder(new SilkEncoderOptions

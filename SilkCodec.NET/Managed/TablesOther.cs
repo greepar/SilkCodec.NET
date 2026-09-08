@@ -46,7 +46,7 @@ internal static class TablesOther
     };
 
     internal static readonly int[] SNR_table_Q1 = {
-        19,     31,     35,     39,     43,     47,     54,     59
+        19,     31,     35,     39,     43,     47,     54,     64
     };
 
     internal static readonly int[] SNR_table_one_bit_per_sample_Q7 = {

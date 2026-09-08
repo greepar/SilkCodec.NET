@@ -197,7 +197,8 @@ internal class EncodePulses
                 pulses_ptr_offset = i * SHELL_CODEC_FRAME_LENGTH;
                 nLS = nRshifts[ i ] - 1;
                 for( k = 0; k < SHELL_CODEC_FRAME_LENGTH; k++ ) {
-                    abs_q = pulses_ptr[pulses_ptr_offset + k] > 0 ? pulses_ptr[pulses_ptr_offset + k]: (-pulses_ptr[pulses_ptr_offset + k]);
+                    var pulse = (sbyte)pulses_ptr[pulses_ptr_offset + k];
+                    abs_q = Math.Abs((int)pulse);
                     for( j = nLS; j > 0; j-- ) {
                         bit = ( abs_q >> j ) & 1;
                         RangeCoder.SKP_Silk_range_encoder( psRC, bit, TablesOther.SKP_Silk_lsb_CDF, 0);
