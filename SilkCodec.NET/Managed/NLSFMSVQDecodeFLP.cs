@@ -39,7 +39,8 @@ internal static class NLSFMSVQDecodeFLP
         SKP_Silk_NLSF_CB_FLP psNLSF_CB_FLP,     /* I    NLSF codebook struct                    */
         int                   []NLSFIndices,       /* I    NLSF indices [ nStages ]                */
               int                   NLSFIndices_offset,
-        int                   LPC_order           /* I    LPC order used                          */
+        int                   LPC_order,          /* I    LPC order used                          */
+        EncoderWorkspace      workspace
     )
     {
         float[] pCB_element;
@@ -97,6 +98,6 @@ internal static class NLSFMSVQDecodeFLP
         }
 
         /* NLSF stabilization */
-        WrappersFLP.SKP_Silk_NLSF_stabilize_FLP( pNLSF, psNLSF_CB_FLP.NDeltaMin, LPC_order );
+        WrappersFLP.SKP_Silk_NLSF_stabilize_FLP( pNLSF, psNLSF_CB_FLP.NDeltaMin, LPC_order, workspace );
     }
 }

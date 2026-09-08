@@ -51,10 +51,11 @@ internal static class FindPitchLagsFLP
 //            const SKP_float *x_buf_ptr, *x_buf;
             float[] x_buf_ptr, x_buf;
             int x_buf_ptr_offset, x_buf_offset;
-            float[] auto_corr = new float[ FIND_PITCH_LPC_ORDER_MAX + 1 ];
-            float[] A = new float[         FIND_PITCH_LPC_ORDER_MAX ];
-            float[] refl_coef = new float[ FIND_PITCH_LPC_ORDER_MAX ];
-            float[] Wsig = new float[      FIND_PITCH_LPC_WIN_MAX ];
+            EncoderWorkspace encoderWorkspace = psEnc.workspace;
+            float[] auto_corr = encoderWorkspace.PitchAutoCorrelation;
+            float[] A = encoderWorkspace.PitchA;
+            float[] refl_coef = encoderWorkspace.PitchReflection;
+            float[] Wsig = encoderWorkspace.PitchWindow;
             float thrhld, res_nrg;
             float[] Wsig_ptr;
             int Wsig_ptr_offset;
@@ -105,13 +106,15 @@ internal static class FindPitchLagsFLP
             auto_corr[ 0 ] += auto_corr[ 0 ] * DefineFLP.FIND_PITCH_WHITE_NOISE_FRACTION;
 
             /* Calculate the reflection coefficients using Schur */
-            res_nrg = SchurFLP.SKP_Silk_schur_FLP( refl_coef,0, auto_corr,0, psEnc.sCmn.pitchEstimationLPCOrder );
+            res_nrg = SchurFLP.SKP_Silk_schur_FLP( refl_coef,0, auto_corr,0, psEnc.sCmn.pitchEstimationLPCOrder,
+                encoderWorkspace.SchurCorrelation );
 
             /* Prediction gain */
             psEncCtrl.predGain = auto_corr[ 0 ] / Math.Max( res_nrg, 1.0f );
 
             /* Convert reflection coefficients to prediction coefficients */
-            K2aFLP.SKP_Silk_k2a_FLP( A, refl_coef, psEnc.sCmn.pitchEstimationLPCOrder );
+            K2aFLP.SKP_Silk_k2a_FLP( A, refl_coef, psEnc.sCmn.pitchEstimationLPCOrder,
+                encoderWorkspace.PitchK2ATemp );
 
             /* Bandwidth expansion */
             BwexpanderFLP.SKP_Silk_bwexpander_FLP( A,0, psEnc.sCmn.pitchEstimationLPCOrder, DefineFLP.FIND_PITCH_BANDWITH_EXPANSION );

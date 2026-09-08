@@ -36,13 +36,14 @@ internal class NLSF2AStable
     internal static void SKP_Silk_NLSF2A_stable(
             short[] pAR_Q12,   /* O    Stabilized AR coefs [LPC_order]     */
             int[] pNLSF,     /* I    NLSF vector         [LPC_order]     */
-            int                   LPC_order                   /* I    LPC/LSF order                       */
+            int                   LPC_order,                  /* I    LPC/LSF order                       */
+            int[]                 invGain_Q30_ptr,
+            EncoderWorkspace      workspace
     )
     {
         int   i;
         int invGain_Q30;
-        int[] invGain_Q30_ptr = new int[1];
-        NLSF2A.SKP_Silk_NLSF2A( pAR_Q12, pNLSF, LPC_order );
+        NLSF2A.SKP_Silk_NLSF2A( pAR_Q12, pNLSF, LPC_order, workspace );
 
 
         /* Ensure stable LPCs */

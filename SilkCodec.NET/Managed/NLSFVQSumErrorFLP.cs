@@ -43,12 +43,12 @@ internal class NLSFVQSumErrorFLP
         float                 []pCB,               /* I    Codebook vectors [ K * LPC_order ]      */
         int                   N,                  /* I    Number of input vectors                 */
         int                   K,                  /* I    Number of codebook vectors              */
-        int                   LPC_order           /* I    LPC order                               */
+        int                   LPC_order,          /* I    LPC order                               */
+        float[]               Wcpy
     )
     {
         int     i, n;
         float   diff, sum_error;
-        float[] Wcpy = new float[ MAX_LPC_ORDER ];
         float[] cb_vec;
         int cb_vec_offset;
 

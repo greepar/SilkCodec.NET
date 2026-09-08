@@ -50,13 +50,13 @@ internal static class PrefilterFLP
         SKP_Silk_prefilter_state_FLP P = psEnc.sPrefilt;
         int   j, k, lag;
         float HarmShapeGain, Tilt, LF_MA_shp, LF_AR_shp;
-        float[] B = new float[ 2 ];
+        float[] B = psEnc.workspace.PrefilterB;
         float[] px;
         int px_offset;
         float[] pxw, pst_res;
         int pxw_offset;
-        float[] HarmShapeFIR = new float[ 3 ];
-        float[] st_res = new float[ MAX_FRAME_LENGTH / NB_SUBFR ];
+        float[] HarmShapeFIR = psEnc.workspace.PrefilterHarmShape;
+        float[] st_res = psEnc.workspace.PrefilterStateResidual;
 
         /* Setup pointers */
         px  = x;

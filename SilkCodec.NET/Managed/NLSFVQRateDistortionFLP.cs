@@ -45,7 +45,8 @@ internal class NLSFVQRateDistortionFLP
         float             []rate_acc,          /* I   Accumulated rates from previous stage               */
         float             mu,                 /* I   Weight between weighted error and rate              */
         int               N,                  /* I   Number of input vectors to be quantized             */
-        int               LPC_order           /* I   LPC order                                           */
+        int               LPC_order,          /* I   LPC order                                           */
+        float[]           weightCopy
     )
     {
         float[] pRD_vec;
@@ -54,7 +55,7 @@ internal class NLSFVQRateDistortionFLP
 
         /* Compute weighted quantization errors for all input vectors over one codebook stage */
         NLSFVQSumErrorFLP.SKP_Silk_NLSF_VQ_sum_error_FLP( pRD, input, w, psNLSF_CBS_FLP.CB,
-                N, psNLSF_CBS_FLP.nVectors, LPC_order );
+                N, psNLSF_CBS_FLP.nVectors, LPC_order, weightCopy );
 
         /* Loop over input vectors */
         pRD_vec = pRD;

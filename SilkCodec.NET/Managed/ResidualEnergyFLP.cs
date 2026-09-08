@@ -116,12 +116,13 @@ internal static class ResidualEnergyFLP
         float[][] a,    /* I    AR coefs for each frame half    */
         float[] gains,                    /* I    Quantization gains              */
         int   subfr_length,               /* I    Subframe length                 */
-        int   LPC_order                   /* I    LPC order                       */
+        int   LPC_order,                  /* I    LPC order                       */
+        float[] LPC_res
     )
     {
         int         shift;
 //        SKP_float       *LPC_res_ptr, LPC_res[ ( MAX_FRAME_LENGTH + NB_SUBFR * MAX_LPC_ORDER ) / 2 ];
-        float[] LPC_res_ptr, LPC_res = new float[ ( MAX_FRAME_LENGTH + NB_SUBFR * MAX_LPC_ORDER ) / 2 ];
+        float[] LPC_res_ptr;
 
 //        LPC_res_ptr = LPC_res + LPC_order;
         LPC_res_ptr = LPC_res;

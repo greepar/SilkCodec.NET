@@ -49,12 +49,13 @@ internal class NLSFMSVQEncodeFLP
         float                 NLSF_mu_fluc_red,   /* I    Fluctuation reduction error weight      */
         int                   NLSF_MSVQ_Survivors,/* I    Max survivors from each stage           */
         int                   LPC_order,          /* I    LPC order                               */
-        int                   deactivate_fluc_red /* I    Deactivate fluctuation reduction        */
+        int                   deactivate_fluc_red,/* I    Deactivate fluctuation reduction        */
+        EncoderWorkspace      workspace
     )
     {
         int     i, s, k, cur_survivors, prev_survivors, input_index, cb_index, bestIndex;
         float   se, wsse, rateDistThreshold, bestRateDist;
-        float[] pNLSF_in = new float[ MAX_LPC_ORDER ];
+        float[] pNLSF_in = workspace.NlsfInput;
 
         float[] pRateDist;
         float[] pRate;
@@ -64,27 +65,14 @@ internal class NLSFMSVQEncodeFLP
         int[] pPath_new;
         float[] pRes;
         float[] pRes_new;
-        if(LOW_COMPLEXITY_ONLY)
-        {
-            pRateDist =    new float[NLSF_MSVQ_TREE_SEARCH_MAX_VECTORS_EVALUATED_LC_MODE()];
-            pRate =        new float[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE ];
-            pRate_new =    new float[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE ];
-            pTempIndices = new int[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE ];
-            pPath =        new int[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE * NLSF_MSVQ_MAX_CB_STAGES];
-            pPath_new =    new int[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE * NLSF_MSVQ_MAX_CB_STAGES];
-            pRes =         new float[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE * MAX_LPC_ORDER ];
-            pRes_new =     new float[MAX_NLSF_MSVQ_SURVIVORS_LC_MODE * MAX_LPC_ORDER ];
-        }else
-        {
-            pRateDist =    new float[NLSF_MSVQ_TREE_SEARCH_MAX_VECTORS_EVALUATED() ];
-            pRate =        new float[MAX_NLSF_MSVQ_SURVIVORS ];
-            pRate_new =    new float[MAX_NLSF_MSVQ_SURVIVORS ];
-            pTempIndices = new int[MAX_NLSF_MSVQ_SURVIVORS ];
-            pPath =        new int[MAX_NLSF_MSVQ_SURVIVORS * NLSF_MSVQ_MAX_CB_STAGES ];
-            pPath_new =    new int[MAX_NLSF_MSVQ_SURVIVORS * NLSF_MSVQ_MAX_CB_STAGES ];
-            pRes =         new float[MAX_NLSF_MSVQ_SURVIVORS * MAX_LPC_ORDER ];
-            pRes_new =     new float[MAX_NLSF_MSVQ_SURVIVORS * MAX_LPC_ORDER ];
-        }
+        pRateDist = workspace.NlsfRateDist;
+        pRate = workspace.NlsfRate;
+        pRate_new = workspace.NlsfRateNew;
+        pTempIndices = workspace.NlsfTempIndices;
+        pPath = workspace.NlsfPath;
+        pPath_new = workspace.NlsfPathNew;
+        pRes = workspace.NlsfResidual;
+        pRes_new = workspace.NlsfResidualNew;
 
         float[] pConstFloat;int pConstFloat_offset;
         float[] pFloat; int pFloat_offset;
@@ -134,7 +122,7 @@ internal class NLSFMSVQEncodeFLP
             }
             /* Nearest neighbor clustering for multiple input data vectors */
             NLSFVQRateDistortionFLP.SKP_Silk_NLSF_VQ_rate_distortion_FLP( pRateDist, pCurrentCBStage,
-                    pRes, pW, pRate, NLSF_mu, prev_survivors, LPC_order );
+                    pRes, pW, pRate, NLSF_mu, prev_survivors, LPC_order, workspace.NlsfWeightCopy );
 
             /* Sort the rate-distortion errors */
             SortFLP.SKP_Silk_insertion_sort_increasing_FLP( pRateDist, 0, pTempIndices, prev_survivors * pCurrentCBStage.nVectors, cur_survivors );
@@ -217,7 +205,7 @@ internal class NLSFMSVQEncodeFLP
                 for( s = 0; s < cur_survivors; s++ ) {
                     /* Decode survivor to compare with previous quantized NLSF vector */
                     NLSFMSVQDecodeFLP.SKP_Silk_NLSF_MSVQ_decode_FLP( pNLSF, psNLSF_CB_FLP,
-                            pPath_new, s * psNLSF_CB_FLP.nStages, LPC_order );
+                            pPath_new, s * psNLSF_CB_FLP.nStages, LPC_order, workspace );
 
                     /* Compare decoded NLSF vector with the previously quantized vector */
                     wsse = 0;
@@ -247,6 +235,6 @@ internal class NLSFMSVQEncodeFLP
         Array.Copy(pPath_new, bestIndex * psNLSF_CB_FLP.nStages, NLSFIndices, 0, psNLSF_CB_FLP.nStages);
 
         /* Decode and stabilize the best survivor */
-        NLSFMSVQDecodeFLP.SKP_Silk_NLSF_MSVQ_decode_FLP( pNLSF, psNLSF_CB_FLP, NLSFIndices, 0, LPC_order );
+        NLSFMSVQDecodeFLP.SKP_Silk_NLSF_MSVQ_decode_FLP( pNLSF, psNLSF_CB_FLP, NLSFIndices, 0, LPC_order, workspace );
     }
 }

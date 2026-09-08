@@ -76,6 +76,21 @@ internal sealed class SKP_Silk_nsq_state
         return copy;
     }
 
+    internal void CopyFrom(SKP_Silk_nsq_state source)
+    {
+        Array.Copy(source.xq, xq, xq.Length);
+        Array.Copy(source.sLTP_shp_Q10, sLTP_shp_Q10, sLTP_shp_Q10.Length);
+        Array.Copy(source.sLPC_Q14, sLPC_Q14, sLPC_Q14.Length);
+        Array.Copy(source.sAR2_Q14, sAR2_Q14, sAR2_Q14.Length);
+        sLF_AR_shp_Q12 = source.sLF_AR_shp_Q12;
+        lagPrev = source.lagPrev;
+        sLTP_buf_idx = source.sLTP_buf_idx;
+        sLTP_shp_buf_idx = source.sLTP_shp_buf_idx;
+        rand_seed = source.rand_seed;
+        prev_inv_gain_Q16 = source.prev_inv_gain_Q16;
+        rewhite_flag = source.rewhite_flag;
+    }
+
     /**
      * set all fields of the instance to zero
      */
@@ -379,6 +394,24 @@ internal sealed class SKP_Silk_encoder_control
     internal int[]   pitchL = new int[ NB_SUBFR ];
 
     internal int     LBRR_usage;                     /* Low bitrate redundancy usage                             */
+
+    internal void ResetForFrame()
+    {
+        lagIndex = 0;
+        contourIndex = 0;
+        PERIndex = 0;
+        NLSFInterpCoef_Q2 = 0;
+        Seed = 0;
+        LTP_scaleIndex = 0;
+        RateLevelIndex = 0;
+        QuantOffsetType = 0;
+        sigtype = 0;
+        LBRR_usage = 0;
+        Array.Clear(LTPIndex);
+        Array.Clear(NLSFIndices);
+        Array.Clear(GainsIndices);
+        Array.Clear(pitchL);
+    }
 }
 
 /**

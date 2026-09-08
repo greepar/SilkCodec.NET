@@ -50,18 +50,19 @@ internal static class FindLTPFLP
         int[] lag,           /* I    LTP lags                                */
         float[] Wght,           /* I    Weights                                 */
         int   subfr_length,       /* I    Subframe length                         */
-        int   mem_offset          /* I    Number of samples in LTP memory         */
+        int   mem_offset,         /* I    Number of samples in LTP memory         */
+        EncoderWorkspace workspace
     )
     {
         int i,k;
         float[] b_ptr, WLTP_ptr;
         float temp;
         float LPC_res_nrg, LPC_LTP_res_nrg;
-        float[] d = new float[NB_SUBFR], delta_b = new float[LTP_ORDER];
+        float[] d = workspace.LtpD, delta_b = workspace.LtpDeltaB;
         float m, g;
-        float[] w = new float[NB_SUBFR], nrg = new float[NB_SUBFR];
+        float[] w = workspace.LtpW, nrg = workspace.LtpNrg;
         float regu;
-        float[] Rr = new float[LTP_ORDER], rr = new float[NB_SUBFR];
+        float[] Rr = workspace.LtpRr, rr = workspace.LtpRrEnergy;
         float[] r_ptr, lag_ptr;
         int r_ptr_offset, lag_ptr_offset;
 
@@ -89,7 +90,7 @@ internal static class FindLTPFLP
             regu = DefineFLP.LTP_DAMPING * ( rr[ k ] + 1.0f );
 
             RegularizeCorrelationsFLP.SKP_Silk_regularize_correlations_FLP(WLTP_ptr, WLTP_ptr_offset, rr, k, regu, LTP_ORDER);
-            SolveLSFLP.SKP_Silk_solve_LDL_FLP( WLTP_ptr, WLTP_ptr_offset, LTP_ORDER, Rr, b_ptr, b_ptr_offset );
+            SolveLSFLP.SKP_Silk_solve_LDL_FLP( WLTP_ptr, WLTP_ptr_offset, LTP_ORDER, Rr, b_ptr, b_ptr_offset, workspace );
 
             /* Calculate residual energy */
             nrg[ k ] = ResidualEnergyFLP.SKP_Silk_residual_energy_covar_FLP( b_ptr, b_ptr_offset,

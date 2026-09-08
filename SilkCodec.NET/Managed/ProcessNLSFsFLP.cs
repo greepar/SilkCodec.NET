@@ -40,14 +40,15 @@ internal static class ProcessNLSFsFLP
     )
     {
         bool     doInterpolate;
-        float[] pNLSFW = new float[ MAX_LPC_ORDER ];
+        EncoderWorkspace workspace = psEnc.workspace;
+        float[] pNLSFW = workspace.NlsfWeights;
         float   NLSF_mu, NLSF_mu_fluc_red, i_sqr, NLSF_interpolation_factor = 0.0f;
         SKP_Silk_NLSF_CB_FLP psNLSF_CB_FLP;
 
 
         /* Used only for NLSF interpolation */
-        float[] pNLSF0_temp = new float[  MAX_LPC_ORDER ];
-        float[] pNLSFW0_temp = new float[ MAX_LPC_ORDER ];
+        float[] pNLSF0_temp = workspace.NlsfInterpolated;
+        float[] pNLSFW0_temp = workspace.NlsfInterpolatedWeights;
         int     i;
 
         EncoderCompat.Assert( psEncCtrl.sCmn.sigtype == SIG_TYPE_VOICED || psEncCtrl.sCmn.sigtype == SIG_TYPE_UNVOICED );
@@ -73,7 +74,7 @@ internal static class ProcessNLSFsFLP
             /* Calculate the interpolated NLSF vector for the first half */
             NLSF_interpolation_factor = 0.25f * psEncCtrl.sCmn.NLSFInterpCoef_Q2;
             WrappersFLP.SKP_Silk_interpolate_wrapper_FLP( pNLSF0_temp, psEnc.sPred.prev_NLSFq, pNLSF,
-                NLSF_interpolation_factor, psEnc.sCmn.predictLPCOrder );
+                NLSF_interpolation_factor, psEnc.sCmn.predictLPCOrder, workspace );
 
             /* Calculate first half NLSF weights for the interpolated NLSFs */
             NLSFVQWeightsLaroiaFLP.SKP_Silk_NLSF_VQ_weights_laroia_FLP( pNLSFW0_temp, pNLSF0_temp, psEnc.sCmn.predictLPCOrder );
@@ -91,18 +92,18 @@ internal static class ProcessNLSFsFLP
         /* Quantize NLSF parameters given the trained NLSF codebooks */
         NLSFMSVQEncodeFLP.SKP_Silk_NLSF_MSVQ_encode_FLP( psEncCtrl.sCmn.NLSFIndices, pNLSF, psNLSF_CB_FLP, psEnc.sPred.prev_NLSFq,
                 pNLSFW, NLSF_mu, NLSF_mu_fluc_red, psEnc.sCmn.NLSF_MSVQ_Survivors,
-                psEnc.sCmn.predictLPCOrder, psEnc.sCmn.first_frame_after_reset );
+                psEnc.sCmn.predictLPCOrder, psEnc.sCmn.first_frame_after_reset, workspace );
 
         /* Convert quantized NLSFs back to LPC coefficients */
-        WrappersFLP.SKP_Silk_NLSF2A_stable_FLP( psEncCtrl.PredCoef[ 1 ], pNLSF, psEnc.sCmn.predictLPCOrder );
+        WrappersFLP.SKP_Silk_NLSF2A_stable_FLP( psEncCtrl.PredCoef[ 1 ], pNLSF, psEnc.sCmn.predictLPCOrder, workspace );
 
         if( doInterpolate ) {
             /* Calculate the interpolated, quantized NLSF vector for the first half */
             WrappersFLP.SKP_Silk_interpolate_wrapper_FLP( pNLSF0_temp, psEnc.sPred.prev_NLSFq, pNLSF,
-                NLSF_interpolation_factor, psEnc.sCmn.predictLPCOrder );
+                NLSF_interpolation_factor, psEnc.sCmn.predictLPCOrder, workspace );
 
             /* Convert back to LPC coefficients */
-            WrappersFLP.SKP_Silk_NLSF2A_stable_FLP( psEncCtrl.PredCoef[ 0 ], pNLSF0_temp, psEnc.sCmn.predictLPCOrder );
+            WrappersFLP.SKP_Silk_NLSF2A_stable_FLP( psEncCtrl.PredCoef[ 0 ], pNLSF0_temp, psEnc.sCmn.predictLPCOrder, workspace );
 
         } else {
             /* Copy LPC coefficients for first half from second half */

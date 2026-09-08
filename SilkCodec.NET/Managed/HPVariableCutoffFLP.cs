@@ -50,7 +50,7 @@ internal static class HPVariableCutoffFLP
     )
     {
         float pitch_freq_Hz, pitch_freq_log, quality, delta_freq, smth_coef, Fc, r;
-        int[] B_Q28 = new int[ 3 ], A_Q28 = new int[ 2 ];
+        int[] B_Q28 = psEnc.workspace.HighPassB, A_Q28 = psEnc.workspace.HighPassA;
 
         /*********************************************/
         /* Estimate low end of pitch frequency range */

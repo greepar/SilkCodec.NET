@@ -43,7 +43,7 @@ internal static class ProcessGainsFLP
     {
         SKP_Silk_shape_state_FLP psShapeSt = psEnc.sShape;
         int     k;
-        int[] pGains_Q16 = new int[ NB_SUBFR ];
+        int[] pGains_Q16 = psEnc.workspace.ProcessGainsQ16;
         float   s, InvMaxSqrVal, gain, quant_offset;
 
         /* Gain reduction when LTP coding gain is high */
@@ -70,7 +70,7 @@ internal static class ProcessGainsFLP
         }
 
         /* Noise shaping quantization */
-        int[] LastGainIndex_ptr = new int[1];
+        int[] LastGainIndex_ptr = psEnc.workspace.ScalarInt;
         LastGainIndex_ptr[0] = psShapeSt.LastGainIndex;
         GainQuant.SKP_Silk_gains_quant( psEncCtrl.sCmn.GainsIndices, pGains_Q16,
                 LastGainIndex_ptr, psEnc.sCmn.nFramesInPayloadBuf );

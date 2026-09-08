@@ -58,15 +58,18 @@ internal static class EncodeFrameFLP
               int                       pIn_offset
     )
     {
-        SKP_Silk_encoder_control_FLP sEncCtrl = new SKP_Silk_encoder_control_FLP();
+        EncoderWorkspace workspace = psEnc.workspace;
+        SKP_Silk_encoder_control_FLP sEncCtrl = workspace.Control;
+        sEncCtrl.ResetForFrame();
         int     k, ret = 0;
-        int[] nBytes = new int[1];
+        int[] nBytes = workspace.ScalarInt;
+        nBytes[0] = 0;
         float[] x_frame, res_pitch_frame;
         int x_frame_offset, res_pitch_frame_offset;
-        short[] pIn_HP = new short[    MAX_FRAME_LENGTH ];
-        short[] pIn_HP_LP = new short[ MAX_FRAME_LENGTH ];
-        float[] xfw = new float[       MAX_FRAME_LENGTH ];
-        float[] res_pitch = new float[ 2 * MAX_FRAME_LENGTH + LA_PITCH_MAX ];
+        short[] pIn_HP = workspace.InputHighPass;
+        short[] pIn_HP_LP = workspace.InputLowPass;
+        float[] xfw = workspace.Prefiltered;
+        float[] res_pitch = workspace.PitchResidual;
         int     LBRR_idx, frame_terminator;
 
         /* Low bitrate redundancy parameters */
@@ -433,8 +436,9 @@ internal static class EncodeFrameFLP
         /****************************************/
         if (psEnc.sCmn.LBRR_enabled != 0)
         {
-            LBRRpayload = new byte[MAX_ARITHM_BYTES];
-            nBytesLBRR = new short[] { MAX_ARITHM_BYTES };
+            LBRRpayload = workspace.LbrrPayload;
+            nBytesLBRR = workspace.ScalarShort;
+            nBytesLBRR[0] = MAX_ARITHM_BYTES;
             SKP_Silk_LBRR_encode_FLP( psEnc, sEncCtrl, LBRRpayload, nBytesLBRR, xfw );
         }
         else
@@ -607,12 +611,14 @@ internal static class EncodeFrameFLP
               float[] xfw               /* I    Input signal                            */
     )
     {
-        int[] Gains_Q16 = new int[ NB_SUBFR ];
+        EncoderWorkspace workspace = psEnc.workspace;
+        int[] Gains_Q16 = workspace.LbrrGainsQ16;
         int     k, frame_terminator;
-        int[] TempGainsIndices = new int[ NB_SUBFR ];
-        int[] nBytes = new int[1];
+        int[] TempGainsIndices = workspace.LbrrGainIndices;
+        int[] nBytes = workspace.ScalarInt;
+        nBytes[0] = 0;
         int nFramesInPayloadBuf;
-        float[] TempGains = new float[ NB_SUBFR ];
+        float[] TempGains = workspace.LbrrGains;
         int     typeOffset, LTP_scaleIndex, Rate_only_parameters = 0;
         /* Control use of inband LBRR */
         ControlCodecFLP.SKP_Silk_LBRR_ctrl_FLP( psEnc, psEncCtrl.sCmn );
@@ -642,7 +648,7 @@ internal static class EncodeFrameFLP
                 if( psEnc.sCmn.nFramesInPayloadBuf == 0 ) {
                     /* First frame in packet copy everything */
 //TODO:use clone rather than memory copy.
-                    psEnc.sNSQ_LBRR = (SKP_Silk_nsq_state) psEnc.sNSQ.clone();
+                    psEnc.sNSQ_LBRR.CopyFrom(psEnc.sNSQ);
 
                     psEnc.sCmn.LBRRprevLastGainIndex = psEnc.sShape.LastGainIndex;
                     /* Increase Gains to get target LBRR rate */
@@ -650,7 +656,7 @@ internal static class EncodeFrameFLP
                     psEncCtrl.sCmn.GainsIndices[ 0 ]  = SigProcFIX.SKP_LIMIT( psEncCtrl.sCmn.GainsIndices[ 0 ], 0, N_LEVELS_QGAIN - 1 );
                 }
                 /* Decode to get Gains in sync with decoder */
-                int[] LBRRprevLastGainIndex_ptr = new int[1];
+                int[] LBRRprevLastGainIndex_ptr = workspace.ScalarInt;
                 LBRRprevLastGainIndex_ptr[0] = psEnc.sCmn.LBRRprevLastGainIndex;
                 GainQuant.SKP_Silk_gains_dequant( Gains_Q16, psEncCtrl.sCmn.GainsIndices,
                     LBRRprevLastGainIndex_ptr, psEnc.sCmn.nFramesInPayloadBuf );

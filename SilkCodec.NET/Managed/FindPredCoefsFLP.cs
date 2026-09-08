@@ -47,12 +47,13 @@ internal static class FindPredCoefsFLP
     )
     {
         int         i;
-        float[] WLTP = new float[ NB_SUBFR * LTP_ORDER * LTP_ORDER ];
-        float[] invGains = new float[ NB_SUBFR ], Wght = new float[ NB_SUBFR ];
-        float[] NLSF = new float[ MAX_LPC_ORDER ];
+        EncoderWorkspace workspace = psEnc.workspace;
+        float[] WLTP = workspace.Wltp;
+        float[] invGains = workspace.InverseGains, Wght = workspace.Weights;
+        float[] NLSF = workspace.Nlsf;
         float[] x_ptr;
         int x_ptr_offset;
-        float[] x_pre_ptr, LPC_in_pre = new float[ NB_SUBFR * MAX_LPC_ORDER + MAX_FRAME_LENGTH ];
+        float[] x_pre_ptr, LPC_in_pre = workspace.LpcInput;
         int x_pre_ptr_offset;
 
         /* Weighting for weighted least squares */
@@ -71,19 +72,19 @@ internal static class FindPredCoefsFLP
             EncoderCompat.Assert( psEnc.sCmn.frame_length - psEnc.sCmn.predictLPCOrder >= psEncCtrl.sCmn.pitchL[ 0 ] + LTP_ORDER / 2 );
 
             /* LTP analysis */
-            float[] LTPredCodGain_ptr = new float[1];
+            float[] LTPredCodGain_ptr = workspace.ScalarFloat;
             LTPredCodGain_ptr[0] = psEncCtrl.LTPredCodGain;
             FindLTPFLP.SKP_Silk_find_LTP_FLP( psEncCtrl.LTPCoef, WLTP, LTPredCodGain_ptr, res_pitch,
                 res_pitch,( psEnc.sCmn.frame_length >> 1 ), psEncCtrl.sCmn.pitchL, Wght,
-                psEnc.sCmn.subfr_length, psEnc.sCmn.frame_length );
+                psEnc.sCmn.subfr_length, psEnc.sCmn.frame_length, workspace );
             psEncCtrl.LTPredCodGain = LTPredCodGain_ptr[0];
 
 
             /* Quantize LTP gain parameters */
-            int[] PERIndex_ptr = new int[1];
+            int[] PERIndex_ptr = workspace.ScalarInt;
             PERIndex_ptr[0] = psEncCtrl.sCmn.PERIndex;
             QuantLTPGainsFLP.SKP_Silk_quant_LTP_gains_FLP( psEncCtrl.LTPCoef, psEncCtrl.sCmn.LTPIndex, PERIndex_ptr,
-                WLTP, psEnc.mu_LTP, psEnc.sCmn.LTPQuantLowComplexity );
+                WLTP, psEnc.mu_LTP, psEnc.sCmn.LTPQuantLowComplexity, workspace );
             psEncCtrl.sCmn.PERIndex = PERIndex_ptr[0];
 
             /* Control LTP scaling */
@@ -115,11 +116,11 @@ internal static class FindPredCoefsFLP
         }
 
         /* LPC_in_pre contains the LTP-filtered input for voiced, and the unfiltered input for unvoiced */
-        int[] NLSFInterpCoef_Q2_ptr = new int[1];
+        int[] NLSFInterpCoef_Q2_ptr = workspace.ScalarInt;
         NLSFInterpCoef_Q2_ptr[0] = psEncCtrl.sCmn.NLSFInterpCoef_Q2;
         FindLPCFLP.SKP_Silk_find_LPC_FLP( NLSF, NLSFInterpCoef_Q2_ptr, psEnc.sPred.prev_NLSFq,
             psEnc.sCmn.useInterpolatedNLSFs * ( 1 - psEnc.sCmn.first_frame_after_reset ), psEnc.sCmn.predictLPCOrder,
-            LPC_in_pre, psEnc.sCmn.subfr_length + psEnc.sCmn.predictLPCOrder );
+            LPC_in_pre, psEnc.sCmn.subfr_length + psEnc.sCmn.predictLPCOrder, workspace );
         psEncCtrl.sCmn.NLSFInterpCoef_Q2 = NLSFInterpCoef_Q2_ptr[0];
 
 
@@ -184,7 +185,7 @@ internal static class FindPredCoefsFLP
 
         /* Calculate residual energy using quantized LPC coefficients */
         ResidualEnergyFLP.SKP_Silk_residual_energy_FLP( psEncCtrl.ResNrg, LPC_in_pre, psEncCtrl.PredCoef, psEncCtrl.Gains,
-            psEnc.sCmn.subfr_length, psEnc.sCmn.predictLPCOrder );
+            psEnc.sCmn.subfr_length, psEnc.sCmn.predictLPCOrder, workspace.ResidualEnergy );
 
         /* Copy to prediction struct for use in next frame for fluctuation reduction */
         Array.Copy(NLSF, 0, psEnc.sPred.prev_NLSFq, 0, psEnc.sCmn.predictLPCOrder);

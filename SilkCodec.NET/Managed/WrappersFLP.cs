@@ -39,18 +39,19 @@ internal static class WrappersFLP
     internal static void SKP_Silk_A2NLSF_FLP(
               float[]               pNLSF,             /* O    NLSF vector      [ LPC_order ]          */
               float[]               pAR,               /* I    LPC coefficients [ LPC_order ]          */
-        int                   LPC_order          /* I    LPC order                               */
+        int                   LPC_order,         /* I    LPC order                               */
+        EncoderWorkspace      workspace
     )
     {
         int   i;
-        int[]   NLSF_fix = new int[  MAX_LPC_ORDER ];
-        int[] a_fix_Q16 = new int[ MAX_LPC_ORDER ];
+        int[] NLSF_fix = workspace.FixedNlsf;
+        int[] a_fix_Q16 = workspace.FixedA;
 
         for( i = 0; i < LPC_order; i++ )
         {
             a_fix_Q16[ i ] = SigProcFLP.SKP_float2int( pAR[ i ] * 65536.0f );
         }
-        A2NLSF.SKP_Silk_A2NLSF( NLSF_fix, a_fix_Q16, LPC_order );
+        A2NLSF.SKP_Silk_A2NLSF( NLSF_fix, a_fix_Q16, LPC_order, workspace.A2NlsfP, workspace.A2NlsfQ );
 
         for( i = 0; i < LPC_order; i++ )
         {
@@ -62,19 +63,21 @@ internal static class WrappersFLP
     internal static void SKP_Silk_NLSF2A_stable_FLP(
               float []                pAR,               /* O    LPC coefficients [ LPC_order ]          */
               float[]                 pNLSF,             /* I    NLSF vector      [ LPC_order ]          */
-        int                     LPC_order          /* I    LPC order                               */
+        int                     LPC_order,         /* I    LPC order                               */
+        EncoderWorkspace        workspace
     )
     {
         int   i;
-        int[]   NLSF_fix = new int[  MAX_LPC_ORDER ];
-        short[] a_fix_Q12 = new short[ MAX_LPC_ORDER ];
+        int[] NLSF_fix = workspace.FixedNlsf;
+        short[] a_fix_Q12 = workspace.FixedAShort;
 
         for( i = 0; i < LPC_order; i++ )
         {
             NLSF_fix[ i ] = SigProcFLP.SKP_float2int( pNLSF[ i ] * 32768.0f );
         }
 
-        NLSF2AStable.SKP_Silk_NLSF2A_stable( a_fix_Q12, NLSF_fix, LPC_order );
+        NLSF2AStable.SKP_Silk_NLSF2A_stable( a_fix_Q12, NLSF_fix, LPC_order, workspace.NlsfInverseGain,
+            workspace );
 
         for( i = 0; i < LPC_order; i++ )
         {
@@ -87,11 +90,12 @@ internal static class WrappersFLP
     internal static void SKP_Silk_NLSF_stabilize_FLP(
               float[]                 pNLSF,             /* I/O  (Un)stable NLSF vector [ LPC_order ]    */
               float[]                 pNDelta_min,       /* I    Normalized delta min vector[LPC_order+1]*/
-        int                     LPC_order          /* I    LPC order                               */
+        int                     LPC_order,         /* I    LPC order                               */
+        EncoderWorkspace        workspace
     )
     {
         int   i;
-        int[]   NLSF_Q15 = new int[ MAX_LPC_ORDER ], ndelta_min_Q15 = new int[ MAX_LPC_ORDER + 1 ];
+        int[] NLSF_Q15 = workspace.NlsfStabilized, ndelta_min_Q15 = workspace.NlsfDeltaMin;
 
         for( i = 0; i < LPC_order; i++ )
         {
@@ -115,10 +119,11 @@ internal static class WrappersFLP
               float[] x0,               /* I    First vector                            */
               float[] x1,               /* I    Second vector                           */
         float                 ifact,              /* I    Interp. factor, weight on second vector */
-        int                   d                   /* I    Number of parameters                    */
+        int                   d,                  /* I    Number of parameters                    */
+        EncoderWorkspace      workspace
     )
     {
-        int[] x0_int = new int[ MAX_LPC_ORDER ], x1_int = new int[ MAX_LPC_ORDER ], xi_int = new int[ MAX_LPC_ORDER ];
+        int[] x0_int = workspace.Interpolate0, x1_int = workspace.Interpolate1, xi_int = workspace.InterpolateResult;
         int ifact_Q2 = ( int )( ifact * 4.0f );
         int i;
 
@@ -149,11 +154,13 @@ internal static class WrappersFLP
     )
     {
         int i, ret;
-        int[] SA_Q8 = new int[1], SNR_dB_Q7 = new int[1], Tilt_Q15 = new int[1];
-        int[] Quality_Bands_Q15 = new int[ VAD_N_BANDS ];
+        int[] SA_Q8 = psEnc.workspace.VadSpeechActivity;
+        int[] SNR_dB_Q7 = psEnc.workspace.VadSnr;
+        int[] Tilt_Q15 = psEnc.workspace.VadTilt;
+        int[] Quality_Bands_Q15 = psEnc.workspace.VadQuality;
 
         ret = VAD.SKP_Silk_VAD_GetSA_Q8( psEnc.sCmn.sVAD, SA_Q8, SNR_dB_Q7, Quality_Bands_Q15, Tilt_Q15,
-            pIn,pIn_offset, psEnc.sCmn.frame_length );
+            pIn,pIn_offset, psEnc.sCmn.frame_length, psEnc.workspace );
 
         psEnc.speech_activity = SA_Q8[0] / 256.0f;
         for( i = 0; i < VAD_N_BANDS; i++ )

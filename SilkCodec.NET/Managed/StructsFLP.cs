@@ -251,6 +251,7 @@ internal sealed class SKP_Silk_encoder_state_FLP
     internal float[]                         lpcInvPredScratch0 = new float[MAX_LPC_ORDER];
     internal float[]                         lpcInvPredScratch1 = new float[MAX_LPC_ORDER];
     internal PitchAnalysisCoreFLP.Workspace  pitchAnalysisWorkspace = new PitchAnalysisCoreFLP.Workspace();
+    internal EncoderWorkspace                workspace = new EncoderWorkspace();
 // djinn: add a parameter: offset
     internal int x_buf_offset;
     internal float                           LTPCorr;                    /* Normalized correlation from pitch lag estimator */
@@ -328,6 +329,144 @@ internal sealed class SKP_Silk_encoder_control_FLP
     internal float[]                   input_quality_bands = new float[ VAD_N_BANDS ];
     internal float                   input_tilt;
     internal float[]                   ResNrg = new float[ NB_SUBFR ];                 /* Residual energy per subframe */
+
+    internal void ResetForFrame()
+    {
+        sCmn.ResetForFrame();
+        LTP_scale = 0;
+        LTP_scale_Q14 = 0;
+        dummy_int32AR2_Q13 = 0;
+        Lambda_Q10 = 0;
+        Lambda = 0;
+        input_quality = 0;
+        coding_quality = 0;
+        pitch_freq_low_Hz = 0;
+        current_SNR_dB = 0;
+        sparseness = 0;
+        predGain = 0;
+        LTPredCodGain = 0;
+        input_tilt = 0;
+        Array.Clear(Gains);
+        Array.Clear(PredCoef[0]);
+        Array.Clear(PredCoef[1]);
+        Array.Clear(LTPCoef);
+        Array.Clear(Gains_Q16);
+        Array.Clear(dummy_int32PredCoef_Q12);
+        Array.Clear(PredCoef_Q12[0]);
+        Array.Clear(PredCoef_Q12[1]);
+        Array.Clear(LTPCoef_Q14);
+        Array.Clear(AR2_Q13);
+        Array.Clear(LF_shp_Q14);
+        Array.Clear(Tilt_Q14);
+        Array.Clear(HarmShapeGain_Q14);
+        Array.Clear(AR1);
+        Array.Clear(AR2);
+        Array.Clear(LF_MA_shp);
+        Array.Clear(LF_AR_shp);
+        Array.Clear(GainsPre);
+        Array.Clear(HarmBoost);
+        Array.Clear(Tilt);
+        Array.Clear(HarmShapeGain);
+        Array.Clear(input_quality_bands);
+        Array.Clear(ResNrg);
+    }
+}
+
+internal sealed class EncoderWorkspace
+{
+    internal readonly SKP_Silk_encoder_control_FLP Control = new();
+    internal readonly int[] ScalarInt = new int[1];
+    internal readonly float[] ScalarFloat = new float[1];
+    internal readonly short[] ScalarShort = new short[1];
+    internal readonly short[] InputHighPass = new short[MAX_FRAME_LENGTH];
+    internal readonly short[] InputLowPass = new short[MAX_FRAME_LENGTH];
+    internal readonly float[] Prefiltered = new float[MAX_FRAME_LENGTH];
+    internal readonly float[] PitchResidual = new float[2 * MAX_FRAME_LENGTH + LA_PITCH_MAX];
+    internal readonly byte[] LbrrPayload = new byte[MAX_ARITHM_BYTES];
+    internal readonly int[] LbrrGainsQ16 = new int[NB_SUBFR];
+    internal readonly int[] LbrrGainIndices = new int[NB_SUBFR];
+    internal readonly float[] LbrrGains = new float[NB_SUBFR];
+
+    internal readonly float[] PitchAutoCorrelation = new float[FIND_PITCH_LPC_ORDER_MAX + 1];
+    internal readonly float[] PitchA = new float[FIND_PITCH_LPC_ORDER_MAX];
+    internal readonly float[] PitchReflection = new float[FIND_PITCH_LPC_ORDER_MAX];
+    internal readonly float[] PitchWindow = new float[FIND_PITCH_LPC_WIN_MAX];
+    internal readonly float[] PitchK2ATemp = new float[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+
+    internal readonly float[] Wltp = new float[NB_SUBFR * LTP_ORDER * LTP_ORDER];
+    internal readonly float[] InverseGains = new float[NB_SUBFR];
+    internal readonly float[] Weights = new float[NB_SUBFR];
+    internal readonly float[] Nlsf = new float[MAX_LPC_ORDER];
+    internal readonly float[] LpcInput = new float[NB_SUBFR * MAX_LPC_ORDER + MAX_FRAME_LENGTH];
+    internal readonly float[] LtpD = new float[NB_SUBFR];
+    internal readonly float[] LtpDeltaB = new float[LTP_ORDER];
+    internal readonly float[] LtpW = new float[NB_SUBFR];
+    internal readonly float[] LtpNrg = new float[NB_SUBFR];
+    internal readonly float[] LtpRr = new float[LTP_ORDER];
+    internal readonly float[] LtpRrEnergy = new float[NB_SUBFR];
+    internal readonly int[] LtpTempIndices = new int[NB_SUBFR];
+    internal readonly float[] LtpRateDistortion = new float[1];
+
+    internal readonly float[] LpcA = new float[MAX_LPC_ORDER];
+    internal readonly float[] LpcATemp = new float[MAX_LPC_ORDER];
+    internal readonly float[] LpcNlsf0 = new float[MAX_LPC_ORDER];
+    internal readonly float[] LpcResidual = new float[(MAX_FRAME_LENGTH + NB_SUBFR * MAX_LPC_ORDER) / 2];
+    internal readonly double[] BurgFirstRow = new double[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+    internal readonly double[] BurgLastRow = new double[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+    internal readonly double[] BurgForward = new double[SigProcFIX.SKP_Silk_MAX_ORDER_LPC + 1];
+    internal readonly double[] BurgBackward = new double[SigProcFIX.SKP_Silk_MAX_ORDER_LPC + 1];
+    internal readonly double[] BurgCoefficients = new double[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+    internal readonly float[] ResidualEnergy = new float[(MAX_FRAME_LENGTH + NB_SUBFR * MAX_LPC_ORDER) / 2];
+
+    internal readonly float[] NlsfWeights = new float[MAX_LPC_ORDER];
+    internal readonly float[] NlsfInterpolated = new float[MAX_LPC_ORDER];
+    internal readonly float[] NlsfInterpolatedWeights = new float[MAX_LPC_ORDER];
+    internal readonly float[] NlsfInput = new float[MAX_LPC_ORDER];
+    internal readonly float[] NlsfRateDist = new float[NLSF_MSVQ_TREE_SEARCH_MAX_VECTORS_EVALUATED()];
+    internal readonly float[] NlsfRate = new float[MAX_NLSF_MSVQ_SURVIVORS];
+    internal readonly float[] NlsfRateNew = new float[MAX_NLSF_MSVQ_SURVIVORS];
+    internal readonly int[] NlsfTempIndices = new int[MAX_NLSF_MSVQ_SURVIVORS];
+    internal readonly int[] NlsfPath = new int[MAX_NLSF_MSVQ_SURVIVORS * NLSF_MSVQ_MAX_CB_STAGES];
+    internal readonly int[] NlsfPathNew = new int[MAX_NLSF_MSVQ_SURVIVORS * NLSF_MSVQ_MAX_CB_STAGES];
+    internal readonly float[] NlsfResidual = new float[MAX_NLSF_MSVQ_SURVIVORS * MAX_LPC_ORDER];
+    internal readonly float[] NlsfResidualNew = new float[MAX_NLSF_MSVQ_SURVIVORS * MAX_LPC_ORDER];
+    internal readonly float[] NlsfWeightCopy = new float[MAX_LPC_ORDER];
+    internal readonly int[] NlsfStabilized = new int[MAX_LPC_ORDER];
+    internal readonly int[] NlsfDeltaMin = new int[MAX_LPC_ORDER + 1];
+
+    internal readonly int[] FixedNlsf = new int[MAX_LPC_ORDER];
+    internal readonly int[] FixedA = new int[MAX_LPC_ORDER];
+    internal readonly short[] FixedAShort = new short[MAX_LPC_ORDER];
+    internal readonly int[] FixedCosLsf = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+    internal readonly int[] FixedPolynomialP = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC / 2 + 1];
+    internal readonly int[] FixedPolynomialQ = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC / 2 + 1];
+    internal readonly int[] FixedAInt32 = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+    internal readonly int[] Interpolate0 = new int[MAX_LPC_ORDER];
+    internal readonly int[] Interpolate1 = new int[MAX_LPC_ORDER];
+    internal readonly int[] InterpolateResult = new int[MAX_LPC_ORDER];
+    internal readonly int[] VadSpeechActivity = new int[1];
+    internal readonly int[] VadSnr = new int[1];
+    internal readonly int[] VadTilt = new int[1];
+    internal readonly int[] VadQuality = new int[VAD_N_BANDS];
+    internal readonly int[] VadScratch = new int[3 * MAX_FRAME_LENGTH / 2];
+    internal readonly short[][] VadBands = Structs.CreateJagged<short>(VAD_N_BANDS, MAX_FRAME_LENGTH / 2);
+    internal readonly int[] VadEnergy = new int[VAD_N_BANDS];
+    internal readonly int[] VadNoiseRatio = new int[VAD_N_BANDS];
+    internal readonly float[][] SchurCorrelation = Structs.CreateJagged<float>(SigProcFIX.SKP_Silk_MAX_ORDER_LPC + 1, 2);
+    internal readonly float[] SolveL = new float[MAX_MATRIX_SIZE * MAX_MATRIX_SIZE];
+    internal readonly float[] SolveT = new float[MAX_MATRIX_SIZE];
+    internal readonly float[] SolveDInverse = new float[MAX_MATRIX_SIZE];
+    internal readonly float[] SolveV = new float[MAX_MATRIX_SIZE];
+    internal readonly float[] SolveD = new float[MAX_MATRIX_SIZE];
+    internal readonly int[] A2NlsfP = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC / 2 + 1];
+    internal readonly int[] A2NlsfQ = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC / 2 + 1];
+    internal readonly int[] NlsfInverseGain = new int[1];
+    internal readonly int[] HighPassB = new int[3];
+    internal readonly int[] HighPassA = new int[2];
+    internal readonly float[] PrefilterB = new float[2];
+    internal readonly float[] PrefilterHarmShape = new float[3];
+    internal readonly float[] PrefilterStateResidual = new float[MAX_FRAME_LENGTH / NB_SUBFR];
+    internal readonly int[] ProcessGainsQ16 = new int[NB_SUBFR];
 }
 internal interface NoiseShapingQuantizerFP
 {

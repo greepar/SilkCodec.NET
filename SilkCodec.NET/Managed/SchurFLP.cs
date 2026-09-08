@@ -42,11 +42,11 @@ internal static class SchurFLP
             int ref1_coef_offset,
             float[] auto_corr,        /* I    autotcorreation sequence (length order+1)   */
             int auto_corr_offset,
-            int         order               /* I    order                                       */
+            int         order,              /* I    order                                       */
+            float[][]   C
     )
     {
         int k, n;
-        float[][] C = Array.ConvertAll(new float[SigProcFIX.SKP_Silk_MAX_ORDER_LPC + 1], _ => new float[2]);
         float Ctmp1, Ctmp2, rc_tmp;
 
         /* copy correlations */

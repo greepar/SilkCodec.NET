@@ -43,42 +43,43 @@ internal static class FindLPCFLP
         int                   useInterpNLSFs,     /* I    Flag                                    */
         int                   LPC_order,          /* I    LPC order                               */
         float[] x,                /* I    Input signal                            */
-        int                   subfr_length        /* I    Subframe length incl preceeding samples */
+        int                   subfr_length,       /* I    Subframe length incl preceeding samples */
+        EncoderWorkspace      workspace
     )
     {
         int     k;
-        float[] a = new float[ MAX_LPC_ORDER ];
+        float[] a = workspace.LpcA;
 
         /* Used only for NLSF interpolation */
         double      res_nrg, res_nrg_2nd, res_nrg_interp;
-        float[] a_tmp = new float[ MAX_LPC_ORDER ], NLSF0 = new float[ MAX_LPC_ORDER ];
-        float[] LPC_res = new float[ ( MAX_FRAME_LENGTH + NB_SUBFR * MAX_LPC_ORDER ) / 2 ];
+        float[] a_tmp = workspace.LpcATemp, NLSF0 = workspace.LpcNlsf0;
+        float[] LPC_res = workspace.LpcResidual;
 
         /* Default: No interpolation */
         interpIndex[0] = 4;
 
         /* Burg AR analysis for the full frame */
         res_nrg = BurgModifiedFLP.SKP_Silk_burg_modified_FLP( a, x, 0, subfr_length, NB_SUBFR,
-                DefineFLP.FIND_LPC_COND_FAC, LPC_order );
+                DefineFLP.FIND_LPC_COND_FAC, LPC_order, workspace );
 
         if( useInterpNLSFs == 1 ) {
 
             /* Optimal solution for last 10 ms; subtract residual energy here, as that's easier than        */
             /* adding it to the residual energy of the first 10 ms in each iteration of the search below    */
             res_nrg -= BurgModifiedFLP.SKP_Silk_burg_modified_FLP( a_tmp, x, ( NB_SUBFR / 2 ) * subfr_length,
-                subfr_length, NB_SUBFR / 2, DefineFLP.FIND_LPC_COND_FAC, LPC_order );
+                subfr_length, NB_SUBFR / 2, DefineFLP.FIND_LPC_COND_FAC, LPC_order, workspace );
 
             /* Convert to NLSFs */
-            WrappersFLP.SKP_Silk_A2NLSF_FLP( NLSF, a_tmp, LPC_order );
+            WrappersFLP.SKP_Silk_A2NLSF_FLP( NLSF, a_tmp, LPC_order, workspace );
 
             /* Search over interpolation indices to find the one with lowest residual energy */
             res_nrg_2nd = float.MaxValue;
             for( k = 3; k >= 0; k-- ) {
                 /* Interpolate NLSFs for first half */
-                WrappersFLP.SKP_Silk_interpolate_wrapper_FLP( NLSF0, prev_NLSFq, NLSF, 0.25f * k, LPC_order );
+                WrappersFLP.SKP_Silk_interpolate_wrapper_FLP( NLSF0, prev_NLSFq, NLSF, 0.25f * k, LPC_order, workspace );
 
                 /* Convert to LPC for residual energy evaluation */
-                WrappersFLP.SKP_Silk_NLSF2A_stable_FLP( a_tmp, NLSF0, LPC_order );
+                WrappersFLP.SKP_Silk_NLSF2A_stable_FLP( a_tmp, NLSF0, LPC_order, workspace );
 
                 /* Calculate residual energy with LSF interpolation */
                 LPCAnalysisFilterFLP.SKP_Silk_LPC_analysis_filter_FLP( LPC_res, a_tmp, x, 0, 2 * subfr_length, LPC_order );
@@ -101,7 +102,7 @@ internal static class FindLPCFLP
 
         if( interpIndex[0] == 4 ) {
             /* NLSF interpolation is currently inactive, calculate NLSFs from full frame AR coefficients */
-            WrappersFLP.SKP_Silk_A2NLSF_FLP( NLSF, a, LPC_order );
+            WrappersFLP.SKP_Silk_A2NLSF_FLP( NLSF, a, LPC_order, workspace );
         }
     }
 }

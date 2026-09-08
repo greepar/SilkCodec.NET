@@ -37,11 +37,11 @@ internal static class K2aFLP
     internal static void SKP_Silk_k2a_FLP(
         float[] A,                 /* O:   prediction coefficients [order]             */
         float[] rc,                /* I:   reflection coefficients [order]             */
-        int       order               /* I:   prediction order                            */
+        int       order,              /* I:   prediction order                            */
+        float[] Atmp
     )
     {
         int   k, n;
-        float[] Atmp = new float[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
 
         for( k = 0; k < order; k++ )
         {

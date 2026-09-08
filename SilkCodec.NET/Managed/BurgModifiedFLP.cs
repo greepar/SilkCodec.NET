@@ -48,18 +48,19 @@ internal static class BurgModifiedFLP
             int   subfr_length,       /* I    input signal subframe length (including D preceeding samples)   */
             int   nb_subfr,           /* I    number of subframes stacked in x                                */
             float WhiteNoiseFrac,     /* I    fraction added to zero-lag autocorrelation                      */
-            int   D                   /* I    order                                                           */
+            int   D,                  /* I    order                                                           */
+            EncoderWorkspace workspace
     )
     {
         int         k, n, s;
         double          C0, num, nrg_f, nrg_b, rc, Atmp, tmp1, tmp2;
         float[] x_ptr;
         int x_ptr_offset;
-        double[] C_first_row = new double [ SigProcFIX.SKP_Silk_MAX_ORDER_LPC ],
-                        C_last_row = new double [ SigProcFIX.SKP_Silk_MAX_ORDER_LPC ];
-        double[] CAf = new double [ SigProcFIX.SKP_Silk_MAX_ORDER_LPC + 1 ],
-                        CAb = new double [ SigProcFIX.SKP_Silk_MAX_ORDER_LPC + 1 ];
-        double[] Af = new double [ SigProcFIX.SKP_Silk_MAX_ORDER_LPC ];
+        double[] C_first_row = workspace.BurgFirstRow, C_last_row = workspace.BurgLastRow;
+        double[] CAf = workspace.BurgForward, CAb = workspace.BurgBackward;
+        double[] Af = workspace.BurgCoefficients;
+
+        Array.Clear(C_first_row, 0, D);
 
         EncoderCompat.Assert( subfr_length * nb_subfr <= MAX_FRAME_SIZE );
         EncoderCompat.Assert( nb_subfr <= MAX_NB_SUBFR );

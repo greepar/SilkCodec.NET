@@ -147,21 +147,16 @@ internal class A2NLSF
     internal static void SKP_Silk_A2NLSF(
         int[]        NLSF,                 /* O    Normalized Line Spectral Frequencies, Q15 (0 - (2^15-1)), [d]    */
         int[]        a_Q16,                /* I/O  Monic whitening filter coefficients input Q16 [d]                   */
-        int    d                     /* I    Filter order (must be even)                                      */
+        int    d,                    /* I    Filter order (must be even)                                      */
+        int[]  P,
+        int[]  Q
     )
     {
         int      i, k, m, dd, root_ix, ffrac;
         int xlo, xhi, xmid;
         int ylo, yhi, ymid;
         int nom, den;
-        int[] P = new int[ SigProcFIX.SKP_Silk_MAX_ORDER_LPC / 2 + 1 ];
-        int[] Q = new int[ SigProcFIX.SKP_Silk_MAX_ORDER_LPC / 2 + 1 ];
-        int[][] PQ = new int[ 2 ][];
         int[] p;
-
-        /* Store pointers to array */
-        PQ[ 0 ] = P;
-        PQ[ 1 ] = Q;
 
         dd =  d >> 1;
 
@@ -268,7 +263,7 @@ internal class A2NLSF
                     break;
                 }
                 /* Alternate pointer to polynomial */
-                p = PQ[ root_ix & 1 ];
+                p = (root_ix & 1) == 0 ? P : Q;
 
                 /* Evaluate polynomial */
                 if(OVERSAMPLE_COSINE_TABLE)

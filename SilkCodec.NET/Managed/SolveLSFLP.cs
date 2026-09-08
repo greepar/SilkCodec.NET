@@ -38,15 +38,16 @@ internal static class SolveLSFLP
         int                   M,                  /* I    Size of matrix                          */
         float[] b,                 /* I    Pointer to b vector                     */
               float[] x,                  /* O    Pointer to x solution vector            */
-              int                   x_offset
+              int                   x_offset,
+              EncoderWorkspace      workspace
     )
     {
         int i;
 //        float[][] L = Array.ConvertAll(new float[MAX_MATRIX_SIZE], _ => new float[MAX_MATRIX_SIZE]);
 //TODO:change L from two dimension to one dimension.
-        float[] L_tmp = new float[MAX_MATRIX_SIZE*MAX_MATRIX_SIZE];
-        float[] T = new float[MAX_MATRIX_SIZE];
-        float[] Dinv = new float[MAX_MATRIX_SIZE];// inverse diagonal elements of D
+        float[] L_tmp = workspace.SolveL;
+        float[] T = workspace.SolveT;
+        float[] Dinv = workspace.SolveDInverse;// inverse diagonal elements of D
 
         Debug.Assert( M <= MAX_MATRIX_SIZE );
 
@@ -55,7 +56,7 @@ internal static class SolveLSFLP
         where L is lower triangular with ones on diagonal
         ****************************************************/
 //        SKP_Silk_LDL_FLP( A, M, &L[ 0 ][ 0 ], Dinv );
-        SKP_Silk_LDL_FLP(A, A_offset, M, L_tmp, Dinv);
+        SKP_Silk_LDL_FLP(A, A_offset, M, L_tmp, Dinv, workspace.SolveV, workspace.SolveD);
 
         /****************************************************
         * substitute D*(L^T) = T. ie:
@@ -170,7 +171,9 @@ internal static class SolveLSFLP
         int             A_offset,
         int             M,       /* (I) Size of Matrix */
         float[] L,      /* (I/O) Pointer to Square Upper triangular Matrix */
-        float[] Dinv    /* (I/O) Pointer to vector holding the inverse diagonal elements of D */
+        float[] Dinv,   /* (I/O) Pointer to vector holding the inverse diagonal elements of D */
+        float[] v,
+        float[] D
     )
     {
 /*        SKP_int i, j, k, loop_count, err = 1;
@@ -182,7 +185,6 @@ internal static class SolveLSFLP
         float[] ptr1, ptr2;
         int ptr1_offset, ptr2_offset;
         double temp, diag_min_value;
-        float[] v = new float[ MAX_MATRIX_SIZE ], D = new float[ MAX_MATRIX_SIZE ]; // temp arrays
 
         Debug.Assert( M <= MAX_MATRIX_SIZE );
 

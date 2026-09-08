@@ -41,7 +41,8 @@ internal class QuantLTPGainsFLP
               int          []periodicity_index,                 /* O    Periodicity index                       */
               float[] W,                                 /* I    Error weights                           */
               float  mu,                                  /* I    Mu value (R/D tradeoff)                 */
-              int    lowComplexity                        /* I    Flag for low complexity                 */
+              int    lowComplexity,                       /* I    Flag for low complexity                 */
+              EncoderWorkspace workspace
     )
     {
 //        SKP_int             j, k, temp_idx[ NB_SUBFR ], cbk_size;
@@ -51,7 +52,7 @@ internal class QuantLTPGainsFLP
 //        const SKP_float     *b_ptr, *W_ptr;
 //        SKP_float           rate_dist_subfr, rate_dist, min_rate_dist;
         int j,k,cbk_size;
-        int[] temp_idx = new int[NB_SUBFR];
+        int[] temp_idx = workspace.LtpTempIndices;
         short[] cl_ptr;
         short[] cbk_ptr_Q14;
         float[] b_ptr;
@@ -81,7 +82,7 @@ internal class QuantLTPGainsFLP
             rate_dist = 0.0f;
             for( j = 0; j < NB_SUBFR; j++ ) {
 
-                float [] rate_dist_subfr_ptr = new float[1];
+                float [] rate_dist_subfr_ptr = workspace.LtpRateDistortion;
                 rate_dist_subfr_ptr[0] = rate_dist_subfr;
 
                 VQNearestNeighborFLP.SKP_Silk_VQ_WMat_EC_FLP(

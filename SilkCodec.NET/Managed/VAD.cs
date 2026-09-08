@@ -88,18 +88,19 @@ internal static class VAD
         int[] pTilt_Q15,                     /* O    current frame's frequency tilt  */
         short[] pIn,                           /* I    PCM input       [framelength]   */
         int                           pIn_offset,
-        int                           framelength                    /* I    Input frame length              */
+        int                           framelength,                   /* I    Input frame length              */
+        EncoderWorkspace              workspace
     )
     {
         int   SA_Q15, input_tilt;
-        int[] scratch = new int[ 3 * MAX_FRAME_LENGTH / 2 ];
+        int[] scratch = workspace.VadScratch;
         int   decimated_framelength, dec_subframe_length, dec_subframe_offset, SNR_Q7, i, b, s;
         int sumSquared=0, smooth_coef_Q16;
         short HPstateTmp;
 
-        short[][] X = EncoderCompat.NewArray<short>(VAD_N_BANDS , MAX_FRAME_LENGTH / 2 );
-        int[] Xnrg = new int[ VAD_N_BANDS ];
-        int[] NrgToNoiseRatio_Q8 = new int[ VAD_N_BANDS ];
+        short[][] X = workspace.VadBands;
+        int[] Xnrg = workspace.VadEnergy;
+        int[] NrgToNoiseRatio_Q8 = workspace.VadNoiseRatio;
         int speech_nrg, x_tmp;
         int   ret = 0;
 

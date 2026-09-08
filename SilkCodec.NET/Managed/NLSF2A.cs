@@ -73,20 +73,20 @@ internal class NLSF2A
     internal static void SKP_Silk_NLSF2A(
             short       []a,               /* o    monic whitening filter coefficients input Q12,  [d]    */
             int         []NLSF,           /* i    normalized line spectral frequencies input Q15, [d]    */
-            int   d                /* i    filter order (should be even)                       */
+            int   d,               /* i    filter order (should be even)                       */
+            EncoderWorkspace workspace
         )
     {
         int k, i, dd;
-        int[] cos_LSF_Q20=new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
-
-        int[] P = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC/2+1];
-        int[] Q = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC/2+1];
+        int[] cos_LSF_Q20 = workspace.FixedCosLsf;
+        int[] P = workspace.FixedPolynomialP;
+        int[] Q = workspace.FixedPolynomialQ;
 
         int Ptmp, Qtmp;
         int f_int;
         int f_frac;
         int cos_val, delta;
-        int[] a_int32 = new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
+        int[] a_int32 = workspace.FixedAInt32;
 
         int maxabs, absval, idx=0, sc_Q16;
 
