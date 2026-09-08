@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <NoWarn>$(NoWarn);CS0162;CS0649;CS0169;CS8618</NoWarn>
         <PackageId>SilkCodec.NET</PackageId>
-        <Version>1.0.2</Version>
+        <Version>1.1.0</Version>
         <Authors>greepar</Authors>
         <Description>Pure managed C# encoder for legacy SILK v3 audio, including standard and Tencent container formats.</Description>
         <PackageTags>silk;codec;audio;encoder;wechat;qq;managed</PackageTags>
