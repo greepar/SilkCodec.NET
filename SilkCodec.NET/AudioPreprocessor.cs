@@ -1,10 +1,14 @@
 using System.Collections.Concurrent;
 
-namespace SilkCodec.NET.Demo;
+namespace SilkCodec.NET;
 
-internal enum AudioProfile
+/// <summary>Controls managed preprocessing applied before MP3 audio is encoded to SILK.</summary>
+public enum SilkMp3AudioProfile
 {
+    /// <summary>Only downmixes, resamples to 24 kHz, and converts to PCM16.</summary>
     Flat,
+
+    /// <summary>Adds filters, gentle compression, and sample-peak limiting for music.</summary>
     Music
 }
 
@@ -52,13 +56,13 @@ internal static class AudioPreprocessor
         IReadOnlyList<float> monoSamples,
         int inputSampleRate,
         int outputSampleRate,
-        AudioProfile profile)
+        SilkMp3AudioProfile profile)
     {
         var output = inputSampleRate == outputSampleRate
             ? monoSamples.ToArray()
             : ResampleBandLimited(monoSamples, inputSampleRate, outputSampleRate);
 
-        if (profile == AudioProfile.Music)
+        if (profile == SilkMp3AudioProfile.Music)
             ApplyMusicProfile(output, outputSampleRate);
 
         return output;

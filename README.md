@@ -25,6 +25,31 @@ byte[] silk = encoder.Encode(monoPcm);
 File.WriteAllBytes("voice.silk", silk);
 ```
 
+or directly MP3 files:
+
+```csharp
+var encoder = new SilkEncoder(new SilkEncoderOptions
+{
+    SampleRate = 24_000,
+    MaxInternalSampleRate = 24_000,
+    BitRate = 100_000,
+    Complexity = 2,
+    Tencent = true
+});
+
+encoder.EncodeMp3("input.mp3", "output.silk", SilkMp3AudioProfile.Flat);
+```
+
+The MP3 API also accepts streams and leaves caller-owned streams open:
+
+```csharp
+using var mp3 = File.OpenRead("input.mp3");
+using var silk = File.Create("output.silk");
+encoder.EncodeMp3(mp3, silk, SilkMp3AudioProfile.Music);
+```
+
+MP3 conversion requires `SampleRate` and `MaxInternalSampleRate` to both be 24 kHz. Caller-owned streams remain open. The current implementation buffers the decoded audio in memory, so the stream overload avoids file-path coupling but is not yet a constant-memory streaming pipeline.
+
 `EncodePcm16LittleEndian` accepts raw mono signed 16-bit little-endian PCM bytes. Incomplete final 20 ms frames are discarded, matching the reference `silk-codec/test/Encoder.c` behavior.
 
 Standard output starts with `#!SILK_V3`, stores each packet as a little-endian signed 16-bit length followed by payload, and ends with `-1`. Tencent output adds a leading `0x02` and omits the terminator.

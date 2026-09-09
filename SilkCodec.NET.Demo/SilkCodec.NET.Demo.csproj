@@ -8,7 +8,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="NLayer" Version="3.0.0" />
         <ProjectReference Include="..\SilkCodec.NET\SilkCodec.NET.csproj" />
     </ItemGroup>
 
