@@ -144,6 +144,46 @@ public sealed class Mp3EncodingTests
         }
     }
 
+    [Theory]
+    [InlineData(SilkMp3AudioProfile.Flat)]
+    [InlineData(SilkMp3AudioProfile.Music)]
+    public void Mp3StreamingMatchesPreviousBatchPipeline(SilkMp3AudioProfile profile)
+    {
+        using var input = new MemoryStream(Mp3Fixture);
+        using var decoder = new NLayer.MpegFile(input);
+        var interleaved = new float[1152 * decoder.Channels];
+        var mono = new List<float>();
+        int count;
+        while ((count = decoder.ReadSamples(interleaved, 0, interleaved.Length)) > 0)
+            for (var i = 0; i < count - count % decoder.Channels; i += decoder.Channels)
+            {
+                double sum = 0;
+                for (var channel = 0; channel < decoder.Channels; channel++) sum += interleaved[i + channel];
+                mono.Add((float)(sum / decoder.Channels));
+            }
+        var pcm = AudioPreprocessor.ToPcm16(AudioPreprocessor.ProcessMono(mono, decoder.SampleRate, 24000, profile));
+        var expected = CreateEncoder(true).Encode(pcm);
+        using var streamInput = new MemoryStream(Mp3Fixture);
+        using var output = new MemoryStream();
+        CreateEncoder(true).EncodeMp3(streamInput, output, profile);
+        Assert.Equal(expected, output.ToArray());
+    }
+
+    [Fact]
+    public void Mp3CancellationStopsBeforeWritingOutput()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        using var input = new MemoryStream(Mp3Fixture);
+        using var output = new MemoryStream();
+        Assert.Throws<OperationCanceledException>(() =>
+            CreateEncoder(true).EncodeMp3(input, output, SilkMp3AudioProfile.Flat, cancellation.Token));
+        Assert.Equal(0, input.Position);
+        Assert.Equal(0, output.Length);
+        Assert.True(input.CanRead);
+        Assert.True(output.CanWrite);
+    }
+
     private static SilkEncoder CreateEncoder(bool tencent) => new(new SilkEncoderOptions
     {
         SampleRate = 24_000,

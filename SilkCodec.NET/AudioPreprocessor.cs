@@ -118,6 +118,9 @@ internal static class AudioPreprocessor
         return output;
     }
 
+    internal static double[] GetResamplerKernels(int inputRate, int outputRate) =>
+        ResamplerKernels.GetOrAdd((inputRate, outputRate), static rates => CreatePolyphaseKernels(rates.InputRate, rates.OutputRate));
+
     private static double[] CreatePolyphaseKernels(int inputSampleRate, int outputSampleRate)
     {
         var kernels = new double[(ResamplerPhaseCount + 1) * ResamplerTapCount];
@@ -201,7 +204,7 @@ internal static class AudioPreprocessor
         }
     }
 
-    private static BiquadCoefficients CreateHighPass(int sampleRate, double frequency, double q)
+    internal static BiquadCoefficients CreateHighPass(int sampleRate, double frequency, double q)
     {
         var omega = 2 * Math.PI * frequency / sampleRate;
         var cosine = Math.Cos(omega);
@@ -215,7 +218,7 @@ internal static class AudioPreprocessor
             (1 - alpha) / a0);
     }
 
-    private static BiquadCoefficients CreateLowPass(int sampleRate, double frequency, double q)
+    internal static BiquadCoefficients CreateLowPass(int sampleRate, double frequency, double q)
     {
         var omega = 2 * Math.PI * frequency / sampleRate;
         var cosine = Math.Cos(omega);
@@ -245,5 +248,5 @@ internal static class AudioPreprocessor
         }
     }
 
-    private readonly record struct BiquadCoefficients(double B0, double B1, double B2, double A1, double A2);
+    internal readonly record struct BiquadCoefficients(double B0, double B1, double B2, double A1, double A2);
 }

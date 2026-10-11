@@ -48,7 +48,7 @@ using var silk = File.Create("output.silk");
 encoder.EncodeMp3(mp3, silk, SilkMp3AudioProfile.Music);
 ```
 
-MP3 conversion requires `SampleRate` and `MaxInternalSampleRate` to both be 24 kHz. Caller-owned streams remain open. The current implementation buffers the decoded audio in memory, so the stream overload avoids file-path coupling but is not yet a constant-memory streaming pipeline.
+MP3 conversion requires `SampleRate` and `MaxInternalSampleRate` to both be 24 kHz. Caller-owned streams remain open. The stream-to-stream overload uses fixed-size decode, resampling, and PCM buffers independent of track duration. The byte-array overload additionally retains the encoded output. Music filter state and resampling phase are preserved across frames.
 
 `EncodePcm16LittleEndian` accepts raw mono signed 16-bit little-endian PCM bytes. Incomplete final 20 ms frames are discarded, matching the reference `silk-codec/test/Encoder.c` behavior.
 
@@ -79,3 +79,13 @@ Legacy SILK is a mono speech codec with a maximum 24 kHz internal sample rate (a
 ## Upstream Reference
 
 The managed SILK codec implementation in this project is based on the SILK implementation from [Jitsi/libjitsi](https://github.com/jitsi/libjitsi), licensed under the Apache License 2.0. Warped noise shaping and related encoder behavior were adapted from the SILK SDK 1.0.9 reference implementation, licensed under the BSD 3-Clause Clear License. See `THIRD-PARTY-NOTICES` for details.
+
+Mono PCM16 little-endian can also be encoded directly from a stream without loading the complete audio:
+
+```csharp
+using var pcm = File.OpenRead("input.pcm");
+using var silk = File.Create("output.silk");
+encoder.EncodePcm16LittleEndian(pcm, silk, cancellationToken);
+```
+
+For cancellable MP3 conversion use `EncodeMp3(mp3, silk, profile, cancellationToken)`. Incomplete final 20 ms frames are discarded, matching the span-based encoder. Caller-owned streams remain open; cancellation or I/O failure can leave partial output in a caller-owned output stream.

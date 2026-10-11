@@ -44,7 +44,7 @@ public sealed class SilkEncoder
     }
 
     /// <summary>Decodes an MP3 stream, preprocesses it as mono 24 kHz audio, and encodes it to SILK.</summary>
-    /// <remarks>The input stream remains open. The complete decoded audio is buffered in memory.</remarks>
+    /// <remarks>The input stream remains open. Decoded audio is processed with fixed-size buffers; only the returned SILK bytes accumulate.</remarks>
     public byte[] EncodeMp3(Stream mp3, SilkMp3AudioProfile profile = SilkMp3AudioProfile.Flat)
     {
         using var output = new MemoryStream();
@@ -91,7 +91,7 @@ public sealed class SilkEncoder
     /// <summary>Decodes an MP3 stream and writes the encoded SILK stream.</summary>
     /// <remarks>
     /// Both streams remain open. Input is consumed and output is written from their current positions.
-    /// The complete decoded audio is buffered in memory.
+    /// Decoded audio is processed with fixed-size buffers independent of audio duration.
     /// </remarks>
     public void EncodeMp3(
         Stream mp3,
@@ -108,9 +108,91 @@ public sealed class SilkEncoder
             throw new ArgumentException("The output stream must be writable.", nameof(output));
         ValidateMp3Options(profile);
 
+        EncodeMp3(mp3, output, profile, CancellationToken.None);
+    }
+
+    /// <summary>Converts MP3 to SILK with bounded audio buffers and cooperative cancellation.</summary>
+    public void EncodeMp3(Stream mp3, Stream output, SilkMp3AudioProfile profile, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mp3);
+        ArgumentNullException.ThrowIfNull(output);
+        if (ReferenceEquals(mp3, output)) throw new ArgumentException("Input and output streams must differ.", nameof(output));
+        if (!mp3.CanRead || !output.CanWrite) throw new ArgumentException("Streams must be readable/writable.");
+        ValidateMp3Options(profile);
+        cancellationToken.ThrowIfCancellationRequested();
         using var decoder = new MpegFile(mp3);
-        var pcm = DecodeMp3(decoder, profile);
-        Encode(pcm, output);
+        var channels = decoder.Channels;
+        if (channels <= 0) throw new InvalidDataException("The MP3 channel count is invalid.");
+        var decoded = new float[1152 * channels];
+        var processor = new StreamingAudioProcessor(mono =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = decoder.ReadSamples(decoded, 0, decoded.Length);
+            var frames = count / channels;
+            for (var i = 0; i < frames; i++)
+            {
+                double sum = 0;
+                for (var channel = 0; channel < channels; channel++) sum += decoded[i * channels + channel];
+                mono[i] = (float)(sum / channels);
+            }
+            return frames;
+        }, decoder.SampleRate, profile);
+        EncodeFrames(frame => processor.Read(frame), output, cancellationToken, rejectEmpty: true);
+    }
+
+    /// <summary>Encodes mono PCM16 little-endian from a stream with fixed-size buffers. Streams remain open.</summary>
+    public void EncodePcm16LittleEndian(Stream pcm, Stream output, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pcm);
+        ArgumentNullException.ThrowIfNull(output);
+        if (ReferenceEquals(pcm, output)) throw new ArgumentException("Input and output streams must differ.", nameof(output));
+        if (!pcm.CanRead || !output.CanWrite) throw new ArgumentException("Streams must be readable/writable.");
+        var bytes = new byte[_options.SampleRate / 50 * 2];
+        EncodeFrames(frame =>
+        {
+            var count = 0;
+            while (count < bytes.Length)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var read = pcm.Read(bytes, count, bytes.Length - count);
+                if (read == 0) break;
+                count += read;
+            }
+            if ((count & 1) != 0) throw new InvalidDataException("PCM byte length must be even.");
+            for (var i = 0; i < count / 2; i++) frame[i] = BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(i * 2, 2));
+            return count / 2;
+        }, output, cancellationToken);
+    }
+
+    private void EncodeFrames(Func<short[], int> read, Stream output, CancellationToken token, bool rejectEmpty = false)
+    {
+        var frame = new short[_options.SampleRate / 50];
+        token.ThrowIfCancellationRequested();
+        var count = read(frame);
+        if (rejectEmpty && count == 0) throw new InvalidDataException("The MP3 stream contains no decodable audio.");
+        if (_options.Tencent) output.WriteByte(0x02);
+        output.Write(Header);
+        using var encoder = new JitsiSilkEncoder(_options);
+        Span<byte> length = stackalloc byte[2];
+        while (count == frame.Length)
+        {
+            token.ThrowIfCancellationRequested();
+            var packet = encoder.EncodeFrame(frame);
+            if (packet.Length > short.MaxValue) throw new InvalidDataException("SILK packet is too large.");
+            if (!packet.IsEmpty)
+            {
+                BinaryPrimitives.WriteInt16LittleEndian(length, (short)packet.Length);
+                output.Write(length);
+                output.Write(packet);
+            }
+            count = read(frame);
+        }
+        token.ThrowIfCancellationRequested();
+        if (!_options.Tencent)
+        {
+            BinaryPrimitives.WriteInt16LittleEndian(length, -1);
+            output.Write(length);
+        }
     }
 
     public void Encode(ReadOnlySpan<short> pcm, Stream output)
@@ -148,35 +230,6 @@ public sealed class SilkEncoder
             BinaryPrimitives.WriteInt16LittleEndian(terminator, -1);
             output.Write(terminator);
         }
-    }
-
-    private static short[] DecodeMp3(MpegFile decoder, SilkMp3AudioProfile profile)
-    {
-        var channels = decoder.Channels;
-        if (channels <= 0)
-            throw new InvalidDataException("The MP3 channel count is invalid.");
-
-        var decoded = new float[1152 * channels];
-        var monoSamples = new List<float>();
-        int samplesRead;
-        while ((samplesRead = decoder.ReadSamples(decoded, 0, decoded.Length)) > 0)
-        {
-            var completeSamples = samplesRead - samplesRead % channels;
-            for (var offset = 0; offset < completeSamples; offset += channels)
-            {
-                double sum = 0;
-                for (var channel = 0; channel < channels; channel++)
-                    sum += decoded[offset + channel];
-
-                monoSamples.Add((float)(sum / channels));
-            }
-        }
-
-        if (monoSamples.Count == 0)
-            throw new InvalidDataException("The MP3 stream contains no decodable audio.");
-
-        var processed = AudioPreprocessor.ProcessMono(monoSamples, decoder.SampleRate, 24_000, profile);
-        return AudioPreprocessor.ToPcm16(processed);
     }
 
     private void ValidateMp3Options(SilkMp3AudioProfile profile)
