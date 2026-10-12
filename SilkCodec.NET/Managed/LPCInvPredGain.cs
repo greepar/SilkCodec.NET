@@ -51,11 +51,11 @@ internal static class LPCInvPredGain
     {
         int   k, n, headrm;
         int rc_Q31, rc_mult1_Q30, rc_mult2_Q16;
-        int[][] Atmp_QA = Array.ConvertAll(new int[2 ], _ => new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC ]);
+        Span<int> scratch = stackalloc int[2 * SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
         int tmp_QA;
-        int[] Aold_QA, Anew_QA;
+        scoped Span<int> Aold_QA, Anew_QA;
 
-        Anew_QA = Atmp_QA[ order & 1 ];
+        Anew_QA = scratch.Slice((order & 1) * SigProcFIX.SKP_Silk_MAX_ORDER_LPC, SigProcFIX.SKP_Silk_MAX_ORDER_LPC);
         /* Increase Q domain of the AR coefficients */
         for( k = 0; k < order; k++ ) {
             Anew_QA[ k ] = ( A_Q12[ k ] << (QA - 12) );
@@ -89,7 +89,7 @@ internal static class LPCInvPredGain
 
             /* Swap pointers */
             Aold_QA = Anew_QA;
-            Anew_QA = Atmp_QA[ k & 1 ];
+            Anew_QA = scratch.Slice((k & 1) * SigProcFIX.SKP_Silk_MAX_ORDER_LPC, SigProcFIX.SKP_Silk_MAX_ORDER_LPC);
 
             /* Update AR coefficient */
             headrm = SKP_Silk_CLZ32( rc_mult2_Q16 ) - 1;
@@ -135,12 +135,12 @@ internal static class LPCInvPredGain
     {
         int   k, n, headrm;
         int rc_Q31, rc_mult1_Q30, rc_mult2_Q16;
-        int[][] Atmp_QA =  Array.ConvertAll(new int[2 ], _ => new int[SigProcFIX.SKP_Silk_MAX_ORDER_LPC ]);
+        Span<int> scratch = stackalloc int[2 * SigProcFIX.SKP_Silk_MAX_ORDER_LPC];
         int tmp_QA;
 
-        int[] Aold_QA, Anew_QA;
+        scoped Span<int> Aold_QA, Anew_QA;
 
-        Anew_QA = Atmp_QA[ order & 1 ];
+        Anew_QA = scratch.Slice((order & 1) * SigProcFIX.SKP_Silk_MAX_ORDER_LPC, SigProcFIX.SKP_Silk_MAX_ORDER_LPC);
         /* Increase Q domain of the AR coefficients */
         for( k = 0; k < order; k++ ) {
             Anew_QA[ k ] = ( A_Q13[ k ] <<( QA - 13 ));
@@ -172,7 +172,7 @@ internal static class LPCInvPredGain
 
             /* Swap pointers */
             Aold_QA = Anew_QA;
-            Anew_QA = Atmp_QA[ k & 1 ];
+            Anew_QA = scratch.Slice((k & 1) * SigProcFIX.SKP_Silk_MAX_ORDER_LPC, SigProcFIX.SKP_Silk_MAX_ORDER_LPC);
 
             /* Update AR coefficient */
             headrm = SKP_Silk_CLZ32( rc_mult2_Q16 ) - 1;

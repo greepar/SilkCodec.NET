@@ -34,23 +34,29 @@ internal static class WarpedAutocorrelationFLP
     {
         EncoderCompat.Assert((order & 1) == 0);
 
-        Array.Clear(state, 0, order + 1);
-        Array.Clear(correlations, 0, order + 1);
-        for (var n = 0; n < length; n++)
+        var stateSpan = state.AsSpan(0, order + 1);
+        var correlationSpan = correlations.AsSpan(0, order + 1);
+        var samples = input.AsSpan(inputOffset, length);
+        stateSpan.Clear();
+        correlationSpan.Clear();
+        foreach (var sample in samples)
         {
-            double tmp1 = input[inputOffset + n];
+            double tmp1 = sample;
+            // The first allpass stage stores this input in state[0]. Keep it
+            // in a local instead of loading that array element at every tap.
+            double first = sample;
             for (var i = 0; i < order; i += 2)
             {
-                var tmp2 = state[i] + warping * (state[i + 1] - tmp1);
-                state[i] = tmp1;
-                correlations[i] += state[0] * tmp1;
+                var tmp2 = stateSpan[i] + warping * (stateSpan[i + 1] - tmp1);
+                stateSpan[i] = tmp1;
+                correlationSpan[i] += first * tmp1;
 
-                tmp1 = state[i + 1] + warping * (state[i + 2] - tmp2);
-                state[i + 1] = tmp2;
-                correlations[i + 1] += state[0] * tmp2;
+                tmp1 = stateSpan[i + 1] + warping * (stateSpan[i + 2] - tmp2);
+                stateSpan[i + 1] = tmp2;
+                correlationSpan[i + 1] += first * tmp2;
             }
-            state[order] = tmp1;
-            correlations[order] += state[0] * tmp1;
+            stateSpan[order] = tmp1;
+            correlationSpan[order] += first * tmp1;
         }
 
         for (var i = 0; i <= order; i++)

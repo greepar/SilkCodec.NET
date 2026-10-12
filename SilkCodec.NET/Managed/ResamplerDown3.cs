@@ -47,11 +47,12 @@ internal static class ResamplerDown3
         int out_offset,
         short[] input,        /* I:   Input signal [ inLen ]              */
         int in_offset,
-        int                             inLen      /* I:   Number of input samples             */
+        int                             inLen,      /* I:   Number of input samples             */
+        int[] buf
     )
     {
         int nSamplesIn, counter, res_Q6;
-        int[] buf = new int[ ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ORDER_FIR ];
+        Debug.Assert(buf.Length >= ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ORDER_FIR);
         int buf_ptr;
 
         /* Copy buffered samples to start of buffer */

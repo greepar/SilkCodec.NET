@@ -51,6 +51,7 @@ internal static class PitchAnalysisCoreFLP
         internal readonly short[] Signal12Khz = new short[12 * PITCH_EST_FRAME_LENGTH_MS];
         internal readonly short[] Signal8KhzFixed = new short[8 * PITCH_EST_FRAME_LENGTH_MS];
         internal readonly short[] Signal24Khz = new short[PITCH_EST_MAX_FRAME_LENGTH];
+        internal readonly int[] Down3Scratch = new int[ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ResamplerDown3.ORDER_FIR];
         internal readonly int[] FixedFilterState = new int[8];
         internal readonly int[] LagIndex = new int[1];
         internal readonly int[] ContourIndex = new int[1];
@@ -159,7 +160,7 @@ internal static class PitchAnalysisCoreFLP
             for(int i_djinn=0; i_djinn<6; i_djinn++)
                 R23[i_djinn] = 0;
             SigProcFLP.SKP_float2short_array( signal_12,0, signal,0, PITCH_EST_FRAME_LENGTH_MS * 12);
-            ResamplerDown23.SKP_Silk_resampler_down2_3( R23,0, signal_8,0, signal_12,0, PITCH_EST_FRAME_LENGTH_MS * 12 );
+            ResamplerDown23.SKP_Silk_resampler_down2_3( R23,0, signal_8,0, signal_12,0, PITCH_EST_FRAME_LENGTH_MS * 12, workspace.Down3Scratch );
             SigProcFLP.SKP_short2float_array( signal_8kHz,0, signal_8,0, frame_length_8kHz );
         }
         else if( Fs_kHz == 16 )
@@ -193,7 +194,7 @@ internal static class PitchAnalysisCoreFLP
             SigProcFLP.SKP_float2short_array( signal_24,0, signal,0, 24 * PITCH_EST_FRAME_LENGTH_MS );
             for(int i_djinn=0; i_djinn<8; i_djinn++)
                 filt_state_fix[i_djinn] = 0;
-            ResamplerDown3.SKP_Silk_resampler_down3( filt_state_fix,0, signal_8,0, signal_24,0, 24 * PITCH_EST_FRAME_LENGTH_MS );
+            ResamplerDown3.SKP_Silk_resampler_down3( filt_state_fix,0, signal_8,0, signal_24,0, 24 * PITCH_EST_FRAME_LENGTH_MS, workspace.Down3Scratch );
             SigProcFLP.SKP_short2float_array( signal_8kHz,0, signal_8,0, frame_length_8kHz );
         }
         else

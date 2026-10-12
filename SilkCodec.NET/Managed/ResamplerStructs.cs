@@ -37,6 +37,10 @@ internal static class ResamplerStructs
 }
 internal sealed class SKP_Silk_resampler_state_struct
  {
+    // Scratch belongs to each resampler instance, never shared across encoders.
+    internal readonly short[] DownFirScratch = new short[ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN / 2];
+    internal readonly int[] DownFirWideScratch = new int[ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ResamplerRom.RESAMPLER_DOWN_ORDER_FIR];
+    internal readonly short[] IirFirScratch = new short[2 * ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ResamplerRom.RESAMPLER_ORDER_FIR_144];
     internal int[]       sIIR = new int[ ResamplerStructs.SKP_Silk_RESAMPLER_MAX_IIR_ORDER ];        /* this must be the first element of this struct */
     internal int[]       sFIR = new int[ ResamplerStructs.SKP_Silk_RESAMPLER_MAX_FIR_ORDER ];
     internal int[]       sDown2 = new int[ 2 ];

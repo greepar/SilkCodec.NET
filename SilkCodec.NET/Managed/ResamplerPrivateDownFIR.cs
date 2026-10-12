@@ -50,8 +50,8 @@ internal static class ResamplerPrivateDownFIR
         SKP_Silk_resampler_state_struct S = (SKP_Silk_resampler_state_struct)SS;
         int nSamplesIn, interpol_ind;
         int max_index_Q16, index_Q16, index_increment_Q16, res_Q6;
-        short[] buf1 = new short[ ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN / 2 ];
-        int[] buf2 = new int[ ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ResamplerRom.RESAMPLER_DOWN_ORDER_FIR ];
+        short[] buf1 = S.DownFirScratch;
+        int[] buf2 = S.DownFirWideScratch;
         int[] buf_ptr;
         int buf_ptr_offset;
         short[] interpol_ptr, FIR_Coefs;

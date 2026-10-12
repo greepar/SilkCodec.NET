@@ -50,7 +50,7 @@ internal static class ResamplerPrivateIIRFIR
 
         int nSamplesIn, table_index;
         int max_index_Q16, index_Q16, index_increment_Q16, res_Q15;
-        short[] buf = new short[ 2 * ResamplerPrivate.RESAMPLER_MAX_BATCH_SIZE_IN + ResamplerRom.RESAMPLER_ORDER_FIR_144 ];
+        short[] buf = S.IirFirScratch;
         int buf_ptr;
 
         /* Copy buffered samples to start of buffer */

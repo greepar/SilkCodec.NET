@@ -43,14 +43,15 @@ internal class NSQDelDecStruct
     internal int RD_Q10;
     public void FieldsInit()
     {
-        Array.Fill(this.RandState, 0);
-        Array.Fill(this.Q_Q10, 0);
-        Array.Fill(this.Xq_Q10, 0);
-        Array.Fill(this.Pred_Q16, 0);
-        Array.Fill(this.Shape_Q10, 0);
-        Array.Fill(this.Gain_Q16, 0);
-        Array.Fill(this.sAR2_Q14, 0);
-        Array.Fill(this.sLPC_Q14, 0);
+        Array.Clear(this.RandState);
+        Array.Clear(this.Q_Q10);
+        Array.Clear(this.Xq_Q10);
+        Array.Clear(this.Pred_Q16);
+        Array.Clear(this.Shape_Q10);
+        Array.Clear(this.Gain_Q16);
+        // The caller immediately copies the AR state and the LPC history.
+        // Only the future LPC samples require clearing before the frame.
+        Array.Clear(this.sLPC_Q14, NSQ_LPC_BUF_LENGTH(), this.sLPC_Q14.Length - NSQ_LPC_BUF_LENGTH());
         this.LF_AR_Q12 = 0;
         this.Seed = 0;
         this.SeedInit = 0;

@@ -27,41 +27,20 @@ namespace SilkCodec.NET.Managed;
  */
 internal static class Macros
 {
-    // (a32 * (SKP_int32)((SKP_int16)(b32))) >> 16 output have to be 32bit int
+    // The legacy implementation splits a signed 32-bit value into high/low
+    // words. A widened multiply gives the same fixed-point result with one
+    // multiply on 64-bit runtimes, without changing truncation or wraparound.
     internal static int SKP_SMULWB(int a32, int b32)
-    {
-        unchecked
-        {
-        return ((((a32) >> 16) * ((short)(b32))) + ((((a32) & 0x0000FFFF) * ((short)(b32))) >> 16));
-            }
-}
+        => unchecked((int)(((long)a32 * (short)b32) >> 16));
 
-    // a32 + (b32 * (SKP_int32)((SKP_int16)(c32))) >> 16 output have to be 32bit int
     internal static int SKP_SMLAWB(int a32, int b32, int c32)
-    {
-        unchecked
-        {
-        return ((a32) + ((((b32) >> 16) * ((short)(c32))) + ((((b32) & 0x0000FFFF) * ((short)(c32))) >> 16)));
-            }
-}
+        => unchecked(a32 + (int)(((long)b32 * (short)c32) >> 16));
 
-    // (a32 * (b32 >> 16)) >> 16
     internal static int SKP_SMULWT(int a32, int b32)
-    {
-        unchecked
-        {
-        return (((a32) >> 16) * ((b32) >> 16) + ((((a32) & 0x0000FFFF) * ((b32) >> 16)) >> 16));
-            }
-}
+        => unchecked((int)(((long)a32 * (b32 >> 16)) >> 16));
 
-    // a32 + (b32 * (c32 >> 16)) >> 16
     internal static int SKP_SMLAWT(int a32, int b32, int c32)
-    {
-        unchecked
-        {
-        return ((a32) + (((b32) >> 16) * ((c32) >> 16)) + ((((b32) & 0x0000FFFF) * ((c32) >> 16)) >> 16));
-            }
-}
+        => unchecked(a32 + (int)(((long)b32 * (c32 >> 16)) >> 16));
 
     // (SKP_int32)((SKP_int16)(a3))) * (SKP_int32)((SKP_int16)(b32)) output have to be 32bit int
     internal static int SKP_SMULBB(int a32, int b32)
